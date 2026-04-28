@@ -100,17 +100,18 @@ partitioned into
 
 Out-of-sample test-period statistics for the four best- and four
 worst-performing models. Realised MVO cost is the IPO objective (lower is
-better). The right-most column reports the bootstrap probability that the
-model has lower mean cost than the OLS-linear baseline (B = 5000 paired
-iid resamples).
+better). The "Bootstrap P" column reports the probability that the model
+has lower mean cost than the OLS-linear baseline (paired iid bootstrap,
+B = 5000); "Gross" is the mean per-month gross exposure (sum of
+absolute portfolio weights).
 
-| Model | MVO cost | Ann. return | Ann. vol | Sharpe | Max DD | $\lVert z \rVert_1$ | $P(\text{cost}<\text{OLS\_lin})$ |
-|---|---:|---:|---:|---:|---:|---:|---:|
+| Model               | MVO cost | Ann. ret | Ann. vol | Sharpe | Max DD | Gross | Bootstrap P |
+|---------------------|---------:|---------:|---------:|-------:|-------:|------:|------------:|
 | **IPO Elastic Net** | **−0.0011** | 18.2% | 15.5% | **1.18** | **9.5%** | 3.53 | **1.000** |
 | OLS Elastic Net     | −0.0010 | 13.3% | 14.5% | 0.91 | 12.4% | 2.84 | 0.995 |
 | OLS Lasso           | −0.0010 | 13.3% | 14.5% | 0.91 | 12.4% | 2.84 | 0.995 |
 | IPO MLP             | +0.0009 | 13.3% | 15.7% | 0.85 | 14.6% | 3.26 | 0.999 |
-| OLS Linear *(baseline)* | +0.0093 | 13.2% | 19.4% | 0.68 | 21.7% | 4.76 | (baseline) |
+| OLS Linear (baseline) | +0.0093 | 13.2% | 19.4% | 0.68 | 21.7% | 4.76 | (baseline) |
 | OLS Polynomial      | +0.0481 | 20.7% | 34.3% | 0.60 | 53.8% | 8.28 | 0.000 |
 | OLS Kernel          | +0.0524 | 15.9% | 31.3% | 0.51 | 43.8% | 9.40 | 0.000 |
 | IPO Polynomial      | +0.0862 |  6.3% | 43.2% | 0.15 | 66.0% | 10.85 | 0.000 |
