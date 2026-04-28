@@ -1,0 +1,73 @@
+{
+  "delta": 50.0,
+  "region": "equality",
+  "split": {
+    "train_end": "2017-01-01",
+    "val_end": "2019-01-01"
+  },
+  "feature_names": [
+    "mom_12_2",
+    "mom_1m",
+    "rev_1d",
+    "vol_60",
+    "log_dollar_vol_60",
+    "Mkt-RF",
+    "SMB",
+    "HML",
+    "RMW",
+    "CMA",
+    "Mom"
+  ],
+  "models": {
+    "OLS_linear": {
+      "val_cost": 0.0018377720971075456,
+      "test_cost": 0.009307025678506211
+    },
+    "OLS_polynomial": {
+      "val_cost": 0.0011259201499604656,
+      "test_cost": 0.04807891796978517
+    },
+    "OLS_ridge": {
+      "alpha": 1000.0,
+      "val_cost": -2.8030778802754417e-06,
+      "test_cost": 0.007978543087501117
+    },
+    "OLS_kernel": {
+      "gamma": 0.1,
+      "val_cost": 0.026475220219207077,
+      "test_cost": 0.052418062668623415
+    },
+    "OLS_nn": {
+      "hidden": 16,
+      "val_cost": 0.003308592719699757,
+      "test_cost": 0.042695322426265045
+    },
+    "IPO_linear": {
+      "weight_decay": 0.0,
+      "val_cost": -0.010139313194542652,
+      "test_cost": 0.0028752938864377697
+    },
+    "IPO_polynomial": {
+      "weight_decay": 0.0,
+      "val_cost": 0.11081929578721487,
+      "test_cost": 0.0903025819396782
+    },
+    "IPO_ridge": {
+      "weight_decay": 0.01,
+      "val_cost": -0.007676580294849847,
+      "test_cost": 0.006536688409935765
+    },
+    "IPO_kernel": {
+      "weight_decay": 0.001,
+      "gamma": 0.1,
+      "val_cost": 0.020954871838852196,
+      "test_cost": 0.027937774295344664
+    },
+    "IPO_nn": {
+      "weight_decay": 0.0001,
+      "hidden": 8,
+      "val_cost": -0.012937484678137127,
+      "test_cost": -0.0011552839398899747
+    }
+  }
+}
