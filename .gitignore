@@ -1,3 +1,1 @@
-Project/*.csv
-Project/factor data/
-*.csv
+Project/sp500_filtered.csv
