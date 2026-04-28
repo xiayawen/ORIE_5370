@@ -40,7 +40,7 @@ FIGURES.mkdir(exist_ok=True, parents=True)
 # Order columns so OLS group plots first, then IPO group, in the same family
 # order. This keeps the legend reading "OLS-linear, OLS-ridge, ... IPO-linear,
 # IPO-ridge, ..." which is what the report references.
-FAMILY_ORDER = ["linear", "ridge", "polynomial", "kernel", "nn"]
+FAMILY_ORDER = ["linear", "ridge", "lasso", "elasticnet", "polynomial", "kernel", "nn"]
 PARADIGM_ORDER = ["OLS", "IPO"]
 
 
@@ -55,6 +55,8 @@ def _colour(name: str) -> str:
     base = {
         "linear":     ("#a6cee3", "#1f78b4"),
         "ridge":      ("#fdbf6f", "#ff7f00"),
+        "lasso":      ("#ffff99", "#b15928"),
+        "elasticnet": ("#dbb267", "#8c510a"),
         "polynomial": ("#b2df8a", "#33a02c"),
         "kernel":     ("#cab2d6", "#6a3d9a"),
         "nn":         ("#fb9a99", "#e31a1c"),
@@ -175,6 +177,35 @@ def dominance_heatmap(perf: pd.DataFrame) -> Path | None:
     return out
 
 
+def pairwise_dominance(pw: pd.DataFrame) -> Path:
+    """Heatmap: P(row-model has lower cost than column-model), bootstrap.
+
+    Cell (i, j) ∈ [0, 1]; values > 0.95 mean row dominates column at the
+    conventional 5% one-sided level.
+    """
+    cols = _ordered(pw.index.tolist())
+    M = pw.loc[cols, cols].to_numpy()
+    fig, ax = plt.subplots(figsize=(9, 8))
+    im = ax.imshow(M, cmap="RdBu_r", vmin=0, vmax=1, aspect="auto")
+    ax.set_xticks(range(len(cols)))
+    ax.set_yticks(range(len(cols)))
+    ax.set_xticklabels(cols, rotation=45, ha="right")
+    ax.set_yticklabels(cols)
+    for i in range(len(cols)):
+        for j in range(len(cols)):
+            v = M[i, j]
+            colour = "white" if abs(v - 0.5) > 0.35 else "black"
+            ax.text(j, i, f"{v:.2f}", ha="center", va="center",
+                    fontsize=7, color=colour)
+    ax.set_title("P(row model cost < column model cost), bootstrap (B = 5000)")
+    fig.colorbar(im, ax=ax, fraction=0.04, pad=0.02)
+    fig.tight_layout()
+    out = FIGURES / "pairwise_dominance.png"
+    fig.savefig(out, dpi=160)
+    plt.close(fig)
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -196,6 +227,11 @@ def main() -> None:
     dom = dominance_heatmap(perf)
     if dom is not None:
         paths.append(dom)
+
+    pw_csv = RESULTS / "pairwise_dominance.csv"
+    if pw_csv.exists():
+        pw = pd.read_csv(pw_csv, index_col=0)
+        paths.append(pairwise_dominance(pw))
 
     for p in paths:
         if p is not None:

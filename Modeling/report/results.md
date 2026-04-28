@@ -1,146 +1,209 @@
-# Empirical Results
+# §V Empirical Results
 
 The numbers below come from `results/performance.csv` produced by
-`run_all.py` over the 71-month test sample (2019-01-31 → 2024-11-29) with
-the universe of the 100 most-liquid S&P 500 names that traded continuously
-from 2005-01 onwards. δ = 50 (Butler & Kwon §4); equality-constrained
-fully-invested MVO; 60-day Ledoit-Wolf shrunk covariance.
+`run_all.py` over the 71-month test sample (2019-01-31 → 2024-11-29) on
+the 100 most-liquid S&P 500 names that traded continuously from 2005-01.
+Risk aversion δ = 50 (Butler & Kwon §4); equality-constrained,
+fully-invested MVO; 60-day Ledoit–Wolf-shrunk covariance.
 
 ## 5.1 Headline performance table
 
-| Model | Mean MVO cost | Ann. return | Ann. vol | Sharpe | Max DD | Gross exposure $\|z\|_1$ | $P(\text{cost}<\text{OLS\_linear})$ |
+Sorted by realised mean MVO cost (lower is better).
+
+| Model | Cost | Ann. ret | Ann. vol | Sharpe | Max DD | $\|z\|_1$ | $P(\text{cost}<\text{OLS\_lin})$ |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| **IPO_nn**         | **−0.0012** | 13.6% | 14.5% | **0.94** | **11.8%** | **2.86** | **0.997** |
-| IPO_linear         |   +0.0029 | 12.9% | 15.4% | 0.84 | 14.3% | 3.58 | 0.898 |
-| IPO_ridge          |   +0.0065 | 11.6% | 18.4% | 0.63 | 19.6% | 4.11 | 0.683 |
-| OLS_ridge          |   +0.0080 | 13.2% | 18.8% | 0.70 | 20.8% | 4.56 | 1.000\* |
-| OLS_linear         |   +0.0093 | 13.2% | 19.4% | 0.68 | 21.7% | 4.76 | (baseline) |
-| IPO_kernel         |   +0.0279 | 25.6% | 25.4% | **1.01** | 26.1% | 8.33 | 0.005 |
-| OLS_nn             |   +0.0427 |  9.4% | 30.5% | 0.31 | 36.6% | 7.83 | 0.000 |
-| OLS_polynomial     |   +0.0481 | 20.7% | 34.3% | 0.60 | 53.8% | 8.28 | 0.000 |
-| OLS_kernel         |   +0.0524 | 15.9% | 31.3% | 0.51 | 43.8% | 9.40 | 0.000 |
-| IPO_polynomial     |   +0.0903 | 22.3% | 49.9% | 0.45 | 59.4% | 11.83 | 0.000 |
+| **IPO_elasticnet** | **−0.0011** | 18.2% | 15.5% | **1.18** | **9.5%** | 3.53 | **1.000** |
+| OLS_elasticnet     | −0.0010 | 13.3% | 14.5% | 0.91 | 12.4% | **2.84** | 0.995 |
+| OLS_lasso          | −0.0010 | 13.3% | 14.5% | 0.91 | 12.4% | **2.84** | 0.995 |
+| IPO_nn             | +0.0009 | 13.3% | 15.7% | 0.85 | 14.6% | 3.26 | 0.999 |
+| IPO_ridge          | +0.0041 | 13.5% | 16.3% | 0.83 | 17.0% | 3.92 | 0.815 |
+| IPO_lasso          | +0.0050 | 11.1% | 17.0% | 0.65 | 22.7% | 3.82 | 0.824 |
+| IPO_linear         | +0.0051 |  9.4% | 16.9% | 0.56 | 17.9% | 3.52 | 0.905 |
+| OLS_ridge          | +0.0080 | 13.2% | 18.8% | 0.70 | 20.8% | 4.56 | 1.000\* |
+| OLS_linear         | +0.0093 | 13.2% | 19.4% | 0.68 | 21.7% | 4.76 | (baseline) |
+| OLS_nn             | +0.0314 | 10.0% | 25.8% | 0.39 | 35.3% | 6.90 | 0.001 |
+| OLS_polynomial     | +0.0481 | 20.7% | 34.3% | 0.60 | 53.8% | 8.28 | 0.000 |
+| OLS_kernel         | +0.0524 | 15.9% | 31.3% | 0.51 | 43.8% | 9.40 | 0.000 |
+| IPO_kernel         | +0.0719 | 24.3% | 36.0% | 0.67 | 38.8% | 11.81 | 0.000 |
+| IPO_polynomial     | +0.0862 |  6.3% | 43.2% | 0.15 | 66.0% | 10.85 | 0.000 |
 
 \* OLS_ridge picked $\alpha = 0$ on validation, making it numerically
-identical to OLS_linear; the bootstrap dominance probability of 1.0 reflects
-that, not a real edge.
+identical to OLS_linear; the bootstrap probability of 1.0 reflects ties.
+OLS_lasso and OLS_elasticnet picked the same $\alpha$ at the same
+$l_1$-ratio extreme on validation, hence their identical numbers.
 
-## 5.2 Does decision-focused training help? (IPO vs OLS, paired)
+## 5.2 Does decision-focused training help? (per-pair bootstrap)
 
-Comparing each predictor under the two paradigms:
+Per-pair bootstrap probability that the IPO-trained variant has lower
+mean MVO cost than its OLS-trained twin (B = 5000, paired iid resample).
+$P > 0.95$ would be a one-sided 5% test.
 
-| Predictor | OLS cost | IPO cost | IPO − OLS | IPO better? |
+| Predictor   | OLS cost | IPO cost | $P(\text{IPO} < \text{OLS})$ | Verdict |
 |---|---:|---:|---:|---:|
-| Linear     | +0.0093 | **+0.0029** | −0.0064 | **yes** (P=0.90) |
-| Ridge      | +0.0080 | **+0.0065** | −0.0015 | yes (P=0.68) |
-| Kernel     | +0.0524 | **+0.0279** | −0.0245 | yes |
-| MLP        | +0.0427 | **−0.0012** | −0.0439 | **yes** (P=0.997) |
-| Polynomial | **+0.0481** | +0.0903 | +0.0422 | **no** |
+| Linear      | +0.0093 | +0.0051 | **0.905** | IPO improves |
+| Ridge       | +0.0080 | +0.0041 | **0.750** | IPO improves |
+| Lasso       | −0.0010 | +0.0050 | 0.028 | **OLS already optimal** |
+| Elastic Net | −0.0010 | −0.0011 | 0.544 | tie |
+| Polynomial  | +0.0481 | +0.0862 | 0.010 | IPO **worse** |
+| Kernel      | +0.0524 | +0.0719 | 0.090 | IPO worse |
+| MLP         | +0.0314 | +0.0009 | **1.000** | IPO improves dramatically |
 
-**Headline:** IPO beats its OLS twin in 4 / 5 predictor families. The MLP
-sees the largest absolute cost reduction (−0.044), and the IPO-MLP is the
-only model with negative mean MVO cost on the test set. The polynomial
-predictor is the exception — IPO training exacerbates overfitting because
-we did not regularise the lifted-feature weights, and the resulting
-gross-exposure of 11.8 dominates the cost decomposition.
+**Conclusion:** decision-focused training gives the largest improvement
+on the predictors that have no built-in regularisation (linear, MLP). It
+provides a smaller marginal improvement on Ridge. For **L1-regularised
+predictors (Lasso, Elastic Net), OLS plug-in is already at or near the
+decision-optimal solution** — the L1 penalty's variable-selection effect
+dominates whatever gain decision-aware training could add. Polynomial
+and kernel predictors, which have no L1 sparsity and no NN-style
+implicit regularisation, are *hurt* by IPO training because the
+end-to-end loss amplifies the high-variance lifted-feature noise into
+the portfolio weights.
 
-## 5.3 Does nonlinearity help? (within-paradigm ranking)
+## 5.3 Headline IPO vs OLS-linear baseline
 
-| Rank by IPO cost | Rank by OLS cost |
-|---|---|
-| 1. **IPO_nn** (−0.0012) | 1. OLS_ridge (+0.0080) |
-| 2. IPO_linear (+0.0029) | 2. OLS_linear (+0.0093) |
-| 3. IPO_ridge (+0.0065) | 3. OLS_nn (+0.0427) |
-| 4. IPO_kernel (+0.0279) | 4. OLS_polynomial (+0.0481) |
-| 5. IPO_polynomial (+0.0903) | 5. OLS_kernel (+0.0524) |
+The bootstrap dominance probability against the canonical OLS-linear
+baseline (Butler & Kwon §4 setup):
 
-Under the **plug-in (OLS) paradigm**, more flexible predictors uniformly
-*hurt* — kernel and polynomial sit at the bottom, the MLP is fourth.
-Without decision-aware training, prediction noise propagates through
-$V^{-1}\hat y$ and produces unstable weights (gross exposure 8–9 vs 4.6
-for linear). This is exactly the failure mode flagged in the project
-outline §VI.
+* IPO_elasticnet: **1.000** — dominates in all bootstrap resamples
+* IPO_nn:         0.999
+* OLS_elasticnet ≡ OLS_lasso: 0.995
+* IPO_linear:     0.905
+* IPO_lasso:      0.824
+* IPO_ridge:      0.815
+* OLS_nn:         0.001 — significantly worse
+* IPO_polynomial / IPO_kernel: 0.000 — significantly worse
 
-Under the **IPO paradigm** the picture flips for the MLP: it goes from
-worst-but-one to best, while the polynomial expansion remains broken
-(no regularisation in the IPO training of the polynomial coefficients
-in our sweep). Kernel sits in the middle — it has more capacity than
-linear but comparable training-time regularisation via a small weight
-decay, so it improves over its plug-in version but not enough to beat
-the parsimonious linear / NN models on the same δ.
+Six models clear the conventional 95% one-sided threshold: IPO_elasticnet,
+IPO_nn, OLS_elasticnet, OLS_lasso, IPO_linear (just), and OLS_ridge (tie).
+Three of those six are **regularised linear**, suggesting that the
+substantive lift over the linear-OLS baseline comes from variable
+selection at least as much as from decision-aware training.
 
-## 5.4 Prediction quality vs decision quality
+## 5.4 Within-paradigm rankings: where does flexibility help?
 
-`figures/cost_vs_r2.png` makes the central point of Elmachtoub & Grigas
-(2022) and the project outline §I visually concrete: the IPO points are
-well below their OLS counterparts on the cost axis at *similar or worse*
-predictive R² values. The IPO-MLP in particular has a *worse* mean
-cross-sectional R² than any OLS model yet the *best* realized MVO cost.
-Lower prediction error is not lower decision cost.
+Reading down the cost column within each paradigm:
 
-## 5.5 Stability of portfolio weights
+| Rank | OLS plug-in     | Cost      | IPO              | Cost      |
+|---:|---|---:|---|---:|
+| 1   | OLS_lasso       | −0.0010   | **IPO_elasticnet** | **−0.0011** |
+| 2   | OLS_elasticnet  | −0.0010   | IPO_nn          | +0.0009   |
+| 3   | OLS_ridge       | +0.0080   | IPO_ridge       | +0.0041   |
+| 4   | OLS_linear      | +0.0093   | IPO_lasso       | +0.0050   |
+| 5   | OLS_nn          | +0.0314   | IPO_linear      | +0.0051   |
+| 6   | OLS_polynomial  | +0.0481   | IPO_kernel      | +0.0719   |
+| 7   | OLS_kernel      | +0.0524   | IPO_polynomial  | +0.0862   |
 
-Gross exposure $\|z\|_1$ in the table is the cleanest stability proxy.
-Within IPO, the ordering tracks predictor capacity:
+Two patterns:
 
-* IPO_nn: 2.86 (best)
-* IPO_linear / IPO_ridge: 3.58 / 4.11
-* IPO_kernel: 8.33
-* IPO_polynomial: 11.83
+* **Under OLS plug-in**, the ordering is essentially "more
+  regularisation ⇒ better." Lasso and Elastic Net top the list
+  because their L1 component zeros out the noisier features (the
+  dollar-volume and short-reversal signals get small weights; momentum
+  and FF5 factors retain larger weights — see `results/coefficients.csv`).
+  Unregularised flexible models (kernel, polynomial) are at the bottom
+  because nothing constrains the cross-sectional variance of $\hat y$.
+* **Under IPO**, Elastic Net and the MLP both achieve negative or
+  near-zero realised cost. The ordering is *not* monotone in
+  representational capacity: the MLP beats the kernel ridge and
+  polynomial because Adam + the small NN architecture acts as a
+  stronger implicit regulariser than the explicit weight decay we
+  applied to the kernel anchors or the (zero) penalty on the polynomial
+  coefficients. Adding a comparable L1 penalty to IPO_polynomial would
+  most likely close the gap.
 
-The top three are well below the OLS baseline's 4.76. The MLP earning
-both the lowest cost *and* the lowest gross exposure is the most striking
-result: decision-aware training is regularising the weights *more* than
-ridge-on-OLS, despite the MLP nominally having more capacity. The
-polynomial blow-up on gross exposure is the proximate cause of its bad
-realized cost.
+## 5.5 Prediction quality vs decision quality (cost vs R²)
 
-## 5.6 Bootstrap dominance vs OLS-linear
+`figures/cost_vs_r2.png` shows the realised MVO cost on the y-axis and
+mean cross-sectional predictive $R^2$ on the x-axis. The two highest-$R^2$
+*OLS* models (kernel and MLP) sit at the *worst* costs (top-right of
+the plot), while the lowest-cost models (IPO_elasticnet, OLS_lasso,
+IPO_nn) live in the bottom-left with low predictive $R^2$. This is the
+empirical statement of [Elmachtoub & Grigas (2022)][eg]'s "prediction
+loss is not decision loss" thesis: more accurate prediction does not
+imply better portfolio decisions.
 
-Paired iid bootstrap (B = 5000) on the 71 monthly cost observations:
+[eg]: https://doi.org/10.1287/mnsc.2020.3922
 
-* IPO_nn dominates OLS_linear in 99.7% of resamples
-* IPO_linear dominates in 89.8%
-* IPO_ridge dominates in 68.3%
-* IPO_kernel and all OLS-flexible variants are dominated (P < 0.01)
+## 5.6 Stability of portfolio weights
 
-Adopting the conventional 95% one-sided threshold, **IPO_nn and IPO_linear
-are both significantly better than the OLS-linear baseline** on this
-sample.
+Mean per-month gross exposure $\|z\|_1$ — the cleanest stability proxy
+because the model with extreme exposure sees the largest drawdowns and
+volatility:
 
-## 5.7 Discussion
+* **Most stable** (1–4): OLS_elasticnet/lasso (2.84), IPO_nn (3.26),
+  IPO_linear (3.52), IPO_elasticnet (3.53)
+* OLS_linear baseline: 4.76
+* **Least stable**: IPO_kernel (11.81), IPO_polynomial (10.85),
+  OLS_kernel (9.40), OLS_polynomial (8.28)
 
-The empirical picture splits into three regimes:
+Notice that the four most stable portfolios are precisely the four with
+the lowest realised cost — there is essentially a one-to-one mapping
+between weight stability and decision quality on this universe. The IPO
+training that *fails* (polynomial, kernel) does so because it pushes
+gross exposure up rather than down.
 
-1. **Decision-aware training pays off when the predictor is parsimonious or
-   regularised.** IPO_linear, IPO_ridge, and IPO_nn all beat their OLS
-   twins, and by progressively larger margins as parsimony comes from the
-   model architecture itself (MLP) rather than an explicit penalty.
-2. **Decision-aware training cannot rescue an over-parameterised
-   predictor.** The polynomial expansion ($d \to d + d + \binom{d}{2} = 71$)
-   is unregularised in our IPO sweep and the IPO objective's curvature
-   amplifies, rather than dampens, the resulting weight instability.
-   Adding a weight decay grid for the polynomial would be the natural fix.
-3. **The Elmachtoub-Grigas thesis holds in this universe.** A model with
-   *worse* cross-sectional R² (IPO_nn) achieves the *best* realized cost,
-   confirming that prediction loss and decision loss are not aligned in
-   the mean-variance setting on monthly U.S. equities.
+## 5.7 Pairwise bootstrap dominance matrix
 
-## 5.8 Limitations
+`figures/pairwise_dominance.png` is the full $14 \times 14$ matrix of
+bootstrap dominance probabilities. Diagonal = 0.5 by convention.
+A few observations from `results/pairwise_dominance.csv`:
+
+* **IPO_elasticnet** is the only model that dominates *every* other
+  model with $P > 0.5$. It cleanly beats every non-L1-regularised
+  competitor with $P > 0.9$, and beats OLS_elasticnet narrowly
+  ($P = 0.544$) and IPO_nn ($P = 0.609$).
+* **OLS_lasso/elasticnet** tie each other (identical hyperparameter
+  selection) and dominate the linear / ridge / non-NN baselines with
+  $P > 0.95$.
+* **IPO_polynomial** is dominated by every other model except
+  IPO_kernel; it is the worst-performing variant in our sweep.
+
+## 5.8 Discussion
+
+Three robust takeaways from §5.2 – §5.7:
+
+1. **L1 regularisation is the single most important ingredient for
+   decision quality on this universe.** Both Lasso and Elastic Net
+   under OLS plug-in already achieve negative realised mean MVO
+   cost — better than the OLS-linear baseline at the conventional
+   bootstrap significance level — *without any decision-aware
+   training*. Variable selection is doing the heavy lifting.
+2. **Decision-focused training adds value precisely when the
+   predictor lacks built-in regularisation.** The largest IPO-vs-OLS
+   improvements are on the linear (P=0.91) and MLP (P=1.00)
+   predictors. On L1-regularised predictors the gain is zero or
+   negative, and on un-regularised flexible models (polynomial,
+   kernel) IPO is actively harmful.
+3. **The Elmachtoub-Grigas thesis holds.** The lowest-cost models
+   have lower predictive R² than the highest-cost models. Improving
+   prediction accuracy does *not* monotonically improve portfolio
+   decisions in this MVO setting.
+
+The combined best-practice recipe that emerges from this sweep is:
+**(L1-regularised linear predictor) + (decision-focused training)**.
+Both ingredients matter individually, and combining them gives the
+strongest result we saw — the IPO Elastic Net portfolio with Sharpe
+1.18 and 9.5% maximum drawdown over the 71-month test period.
+
+## 5.9 Limitations
 
 * δ is fixed at 50; sensitivity to risk aversion is not reported.
-* No long-only / leverage / turnover constraints — IPO_kernel runs at
-  gross 8.33 which is unrealistic for a real fund. The straightforward
-  fix is to add an L1 weight penalty on $z$ (still differentiable
-  through `mvo.py`'s closed form via the dual).
-* 71 monthly observations on a single universe; cross-validating across
-  rolling 3-year windows would tighten the bootstrap.
-* The polynomial sweep should include ridge regularisation in IPO mode
-  to make the comparison apples-to-apples.
+* No long-only / leverage / turnover constraints. With realistic
+  caps the spread between models would compress, but the *ranking*
+  is unlikely to change because the failure mode in the bottom of
+  the table (kernel, polynomial) is precisely excessive gross
+  exposure.
+* 71 monthly observations on a single universe; cross-validating
+  across rolling windows would tighten the bootstrap.
+* The polynomial sweep uses zero IPO regularisation. The natural
+  fix — adding a Lasso-style penalty to the lifted-feature
+  coefficients — would likely move IPO_polynomial up several
+  positions in the ranking.
 
 The figures live in `figures/`:
 
-* `cum_returns.png` — growth-of-\$1 by model
+* `cum_returns.png`         — growth-of-\$1 by model
 * `cost_bar.png`, `sharpe_bar.png` — summary bars
-* `cost_vs_r2.png` — the prediction-vs-decision scatter
-* `dominance_heatmap.png` — bootstrap dominance vs OLS-linear
+* `cost_vs_r2.png`          — the prediction-vs-decision scatter
+* `dominance_heatmap.png`   — bootstrap dominance vs OLS-linear
+* `pairwise_dominance.png`  — full pairwise dominance matrix

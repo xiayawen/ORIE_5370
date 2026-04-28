@@ -59,16 +59,27 @@ outline's *Unsolved Questions* section.
 
 ## 2. Predictive models
 
-Five predictors $f(x;\theta)$ from the outline §IV are implemented in
-`ipo_models.py`:
+Seven predictors $f(x;\theta)$ from the outline §IV are implemented in
+`ipo_models.py`. The three regularised linear models share architecture
+($W x + b$) and differ only in the penalty applied at training time.
 
-| Model | Functional form | Trained parameters |
+| Model | Functional form | Penalty (training time) |
 |---|---|---|
-| Linear | $W x + b$ | $W \in \mathbb{R}^{1\times d}, b$ |
-| Polynomial | $W\,\phi(x) + b$ with $\phi(x) = [x,\, x^2,\, \{x_i x_j\}_{i<j}]$ | $W,b$ on the lifted features |
-| Ridge | $Wx + b$ with $\ell_2$ penalty $\lambda\|W\|^2$ | $W,b$ |
-| Kernel | $\sum_{m=1}^M \alpha_m K(x, x_m)$, RBF kernel, $M=200$ random anchors | $\alpha,b$ |
-| MLP | $W_2\,\tanh(W_1 x + b_1) + b_2$, single hidden layer | $W_1,b_1,W_2,b_2$ |
+| Linear     | $W x + b$ | none |
+| Ridge      | $W x + b$ | $\lambda \|W\|_2^2$ |
+| Lasso      | $W x + b$ | $\lambda \|W\|_1$ |
+| Elastic Net | $W x + b$ | $\lambda_1 \|W\|_1 + \lambda_2 \|W\|_2^2$ |
+| Polynomial | $W\,\phi(x) + b$ with $\phi(x) = [x,\, x^2,\, \{x_i x_j\}_{i<j}]$ | none |
+| Kernel     | $\sum_{m=1}^M \alpha_m K(x, x_m)$, RBF kernel, $M=200$ random anchors | $\lambda \|\alpha\|_2^2$ |
+| MLP        | $W_2\,\tanh(W_1 x + b_1) + b_2$, single hidden layer | $\lambda \|\theta\|_2^2$ (Adam weight decay) |
+
+Under the **OLS plug-in paradigm**, Lasso and Elastic Net are fit by
+sklearn coordinate descent (`sklearn.linear_model.Lasso` and
+`sklearn.linear_model.ElasticNet`). Under the **IPO paradigm** the
+penalties enter as additional terms on the realised MVO cost: the L1
+component is added explicitly to the loss before backprop (PyTorch's
+Adam handles the non-differentiability at zero via subgradient), while
+the L2 component is implemented through Adam's `weight_decay` argument.
 
 Each model is trained under two paradigms:
 

@@ -33,6 +33,7 @@ from tqdm import tqdm
 from build_dataset import OUT_DIR, load_panel
 from ipo_models import (
     LinearPredictor, PolynomialPredictor, RidgePredictor,
+    LassoPredictor, ElasticNetPredictor,
     KernelRidgePredictor, MLPPredictor,
     fit_ols, make_kernel_anchors,
 )
@@ -105,6 +106,7 @@ def train_ipo(
     epochs: int = 60,
     lr: float = 5e-3,
     weight_decay: float = 0.0,
+    l1_penalty: float = 0.0,
     delta: float = DELTA,
     region: str = REGION,
     patience: int = 10,
@@ -112,10 +114,19 @@ def train_ipo(
 ) -> dict:
     """Decision-focused training using closed-form ``z*`` and PyTorch autograd.
 
+    ``weight_decay`` is the L2 penalty applied via Adam (proportional to the
+    full parameter vector). ``l1_penalty`` is the explicit L1 penalty applied
+    only to the predictor's weight matrix (via the ``linear.weight`` parameter
+    when present), used by ``LassoPredictor`` and ``ElasticNetPredictor``.
+
     Returns a dict with the best validation cost and a list of (epoch, train,
     val) curves for inspection.
     """
     opt = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+
+    # Resolve the weight tensor used for the L1 penalty (linear / ridge / lasso /
+    # elastic-net all expose .linear.weight; for kernel/NN we leave l1=0).
+    weight_param = getattr(getattr(model, "linear", None), "weight", None)
 
     # Pre-cast tensors once.
     Xtr = [torch.tensor(X, dtype=torch.float32, device=DEVICE) for X in ds_train["X"]]
@@ -141,6 +152,8 @@ def train_ipo(
             except RuntimeError:
                 continue
             loss = mvo_cost(z, y, V, delta)
+            if l1_penalty > 0 and weight_param is not None:
+                loss = loss + l1_penalty * weight_param.abs().sum()
             if not torch.isfinite(loss):
                 continue
             loss.backward()
@@ -181,6 +194,10 @@ def model_factory(name: str, d_in: int, anchors: torch.Tensor | None = None,
         return PolynomialPredictor(d_in, degree=degree, interactions=True)
     if name == "ridge":
         return RidgePredictor(d_in)
+    if name == "lasso":
+        return LassoPredictor(d_in)
+    if name == "elasticnet":
+        return ElasticNetPredictor(d_in)
     if name == "kernel":
         if anchors is None:
             raise ValueError("kernel model requires anchors")
@@ -195,10 +212,19 @@ def model_factory(name: str, d_in: int, anchors: torch.Tensor | None = None,
 # ---------------------------------------------------------------------------
 
 OLS_RIDGE_ALPHAS = [0.0, 1.0, 10.0, 100.0, 1000.0]
+OLS_LASSO_ALPHAS = [1e-4, 1e-3, 1e-2, 1e-1]
+OLS_ELASTICNET_L1RATIO = [0.25, 0.5, 0.75]      # convex combinations of L1/L2
 IPO_RIDGE_WD = [0.0, 1e-4, 1e-3, 1e-2]
+IPO_LASSO_L1 = [1e-5, 1e-4, 1e-3]
+IPO_ELASTICNET = [(1e-4, 1e-4), (1e-3, 1e-4)]    # (l1_penalty, weight_decay)
 IPO_NN_HIDDEN = [8, 16, 32]
 KERNEL_GAMMA = [0.1, 0.5, 1.0]
 KERNEL_M = 200
+
+# Order in which we run models. Linear / ridge / lasso / elasticnet first
+# because their training is fast; kernel / nn last. The same ordering is used
+# in evaluate.py and make_figures.py for consistent column / row layout.
+MODEL_FAMILIES = ["linear", "ridge", "lasso", "elasticnet", "polynomial", "kernel", "nn"]
 
 
 def run_all(panel: dict, seed: int = 0) -> dict:
@@ -218,7 +244,7 @@ def run_all(panel: dict, seed: int = 0) -> dict:
     summary: dict[str, dict] = {}
 
     # ----------- OLS plug-in baselines -----------
-    for name in ["linear", "polynomial", "ridge", "kernel", "nn"]:
+    for name in MODEL_FAMILIES:
         if name == "ridge":
             best = None
             for alpha in OLS_RIDGE_ALPHAS:
@@ -229,6 +255,27 @@ def run_all(panel: dict, seed: int = 0) -> dict:
                     best = (alpha, v, m)
             alpha, _, m = best
             summary[f"OLS_{name}"] = {"alpha": alpha}
+        elif name == "lasso":
+            best = None
+            for alpha in OLS_LASSO_ALPHAS:
+                m = model_factory(name, d_in)
+                fit_ols(m, ds_train["X"], ds_train["y"], alpha=alpha)
+                v = realized_mvo_cost(m, ds_val)
+                if best is None or v < best[1]:
+                    best = (alpha, v, m)
+            alpha, _, m = best
+            summary[f"OLS_{name}"] = {"alpha": alpha}
+        elif name == "elasticnet":
+            best = None
+            for alpha in OLS_LASSO_ALPHAS:
+                for l1r in OLS_ELASTICNET_L1RATIO:
+                    m = model_factory(name, d_in)
+                    fit_ols(m, ds_train["X"], ds_train["y"], alpha=alpha, l1_ratio=l1r)
+                    v = realized_mvo_cost(m, ds_val)
+                    if best is None or v < best[1]:
+                        best = ((alpha, l1r), v, m)
+            (alpha, l1r), _, m = best
+            summary[f"OLS_{name}"] = {"alpha": alpha, "l1_ratio": l1r}
         elif name == "kernel":
             best = None
             for g in KERNEL_GAMMA:
@@ -263,21 +310,26 @@ def run_all(panel: dict, seed: int = 0) -> dict:
               f"test={summary[f'OLS_{name}']['test_cost']:+.4f}")
 
     # ----------- IPO (decision-focused) variants -----------
-    for name in ["linear", "polynomial", "ridge", "kernel", "nn"]:
+    for name in MODEL_FAMILIES:
         print(f"\n=== training IPO-{name} ===")
         best = None
+        # ``grid`` entries are (family_name, weight_decay, l1_penalty, extras).
         if name in ("linear", "polynomial"):
-            grid = [(name, 0.0, {})]
+            grid = [(name, 0.0, 0.0, {})]
         elif name == "ridge":
-            grid = [("ridge", wd, {}) for wd in IPO_RIDGE_WD]
+            grid = [("ridge", wd, 0.0, {}) for wd in IPO_RIDGE_WD]
+        elif name == "lasso":
+            grid = [("lasso", 0.0, l1, {}) for l1 in IPO_LASSO_L1]
+        elif name == "elasticnet":
+            grid = [("elasticnet", wd, l1, {}) for (l1, wd) in IPO_ELASTICNET]
         elif name == "kernel":
-            grid = [("kernel", 1e-3, {"gamma": g}) for g in KERNEL_GAMMA]
+            grid = [("kernel", 1e-3, 0.0, {"gamma": g}) for g in KERNEL_GAMMA]
         elif name == "nn":
-            grid = [("nn", 1e-4, {"hidden": h}) for h in IPO_NN_HIDDEN]
+            grid = [("nn", 1e-4, 0.0, {"hidden": h}) for h in IPO_NN_HIDDEN]
         else:
             grid = []
 
-        for nm, wd, extras in grid:
+        for nm, wd, l1, extras in grid:
             kwargs = {}
             if nm == "kernel":
                 kwargs["anchors"] = anchors
@@ -290,15 +342,15 @@ def run_all(panel: dict, seed: int = 0) -> dict:
 
             t0 = time.time()
             info = train_ipo(m, ds_train, ds_val, epochs=80, lr=5e-3,
-                             weight_decay=wd, patience=12)
+                             weight_decay=wd, l1_penalty=l1, patience=12)
             dt = time.time() - t0
-            print(f"  wd={wd}  extras={extras}  val={info['best_val']:+.4f}  "
+            print(f"  wd={wd}  l1={l1}  extras={extras}  val={info['best_val']:+.4f}  "
                   f"({dt:.1f}s)")
             if best is None or info["best_val"] < best[0]:
-                best = (info["best_val"], m, wd, extras)
+                best = (info["best_val"], m, wd, l1, extras)
 
-        _, m, wd, extras = best
-        summary[f"IPO_{name}"] = {"weight_decay": wd, **extras}
+        _, m, wd, l1, extras = best
+        summary[f"IPO_{name}"] = {"weight_decay": wd, "l1_penalty": l1, **extras}
         torch.save(m.state_dict(), MODELS_DIR / f"IPO_{name}.pt")
         if name == "kernel":
             torch.save(m.anchors, MODELS_DIR / f"IPO_{name}.anchors.pt")

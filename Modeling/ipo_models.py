@@ -16,6 +16,8 @@ Models implemented:
 * ``PolynomialPredictor`` — ``f(x) = W φ(x) + b``, with ``φ`` adding pairwise
                             interactions and squared terms
 * ``RidgePredictor``      — same as Linear, but trained with L2 regularisation
+* ``LassoPredictor``      — same as Linear, trained with L1 regularisation
+* ``ElasticNetPredictor`` — same as Linear, trained with L1 + L2 regularisation
 * ``KernelRidgePredictor``— ``f(x) = Σ α_i K(x, x_i)`` with RBF kernel
                             (anchor points are a random subsample of training
                             features, fixed up-front so the model is finite-
@@ -97,6 +99,23 @@ class RidgePredictor(LinearPredictor):
     """Identical to ``LinearPredictor``; the L2 penalty is applied at training time."""
 
 
+class LassoPredictor(LinearPredictor):
+    """Identical to ``LinearPredictor``; the L1 penalty is applied at training time.
+
+    For OLS plug-in we use ``sklearn.linear_model.Lasso``. For IPO training the
+    L1 penalty enters as an explicit ``λ‖W‖_1`` term in the loss (Adam handles
+    the non-differentiability at zero via subgradient).
+    """
+
+
+class ElasticNetPredictor(LinearPredictor):
+    """Identical to ``LinearPredictor``; trained with both L1 and L2 penalties.
+
+    Loss is ``ℓ + λ_1 ‖W‖_1 + λ_2 ‖W‖_2^2`` where ``ℓ`` is either MSE
+    (OLS plug-in via sklearn) or realized MVO cost (IPO).
+    """
+
+
 class KernelRidgePredictor(nn.Module):
     """Finite-dimensional kernel ridge regressor.
 
@@ -145,14 +164,39 @@ def stack_panel(X_list: list[np.ndarray], y_list: list[np.ndarray]):
     return np.vstack(X_list), np.concatenate(y_list)
 
 
-def fit_ols(model: nn.Module, X_list: list[np.ndarray], y_list: list[np.ndarray], alpha: float = 0.0):
-    """Fit ``model`` parameters in closed form using stacked OLS / Ridge.
+def fit_ols(model: nn.Module, X_list: list[np.ndarray], y_list: list[np.ndarray],
+            alpha: float = 0.0, l1_ratio: float = 0.5):
+    """Fit ``model`` parameters using stacked OLS / Ridge / Lasso / Elastic Net.
 
-    Supports ``LinearPredictor``, ``RidgePredictor`` and ``PolynomialPredictor``.
-    For ``KernelRidgePredictor`` and ``MLPPredictor`` the closed-form OLS does
-    not apply; in those cases we fall back to a small sklearn-style optimizer.
+    Supports closed-form ``LinearPredictor``, ``RidgePredictor`` and
+    ``PolynomialPredictor``; sklearn coordinate-descent for ``LassoPredictor``
+    and ``ElasticNetPredictor``; PyTorch Adam for ``KernelRidgePredictor``
+    and ``MLPPredictor``.
+
+    ``l1_ratio`` is only used by ``ElasticNetPredictor`` (sklearn convention:
+    ``l1_ratio=1`` ⇒ Lasso, ``l1_ratio=0`` ⇒ Ridge).
     """
     X, y = stack_panel(X_list, y_list)
+
+    # Lasso / Elastic Net via sklearn coordinate descent (ordinary L2 loss).
+    if isinstance(model, (LassoPredictor, ElasticNetPredictor)):
+        from sklearn.linear_model import Lasso, ElasticNet
+        if isinstance(model, LassoPredictor):
+            est = Lasso(alpha=max(alpha, 1e-6), fit_intercept=True,
+                        max_iter=20000, tol=1e-5)
+        else:
+            est = ElasticNet(alpha=max(alpha, 1e-6), l1_ratio=l1_ratio,
+                             fit_intercept=True, max_iter=20000, tol=1e-5)
+        est.fit(X, y)
+        d = X.shape[1]
+        with torch.no_grad():
+            model.linear.weight.copy_(
+                torch.tensor(est.coef_, dtype=model.linear.weight.dtype).reshape(1, d)
+            )
+            model.linear.bias.copy_(
+                torch.tensor([est.intercept_], dtype=model.linear.bias.dtype)
+            )
+        return
 
     if isinstance(model, (LinearPredictor, RidgePredictor)):
         d = X.shape[1]

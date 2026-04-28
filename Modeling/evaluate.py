@@ -37,6 +37,7 @@ import torch
 from build_dataset import OUT_DIR, load_panel
 from ipo_models import (
     LinearPredictor, PolynomialPredictor, RidgePredictor,
+    LassoPredictor, ElasticNetPredictor,
     KernelRidgePredictor, MLPPredictor,
 )
 from mvo import mvo_solve, mvo_cost
@@ -77,6 +78,10 @@ def load_model(name: str, summary: dict, d_in: int) -> torch.nn.Module:
         m = PolynomialPredictor(d_in, degree=2, interactions=True)
     elif family == "ridge":
         m = RidgePredictor(d_in)
+    elif family == "lasso":
+        m = LassoPredictor(d_in)
+    elif family == "elasticnet":
+        m = ElasticNetPredictor(d_in)
     else:
         m = LinearPredictor(d_in)
     state = torch.load(MODELS_DIR / f"{name}.pt", weights_only=True)
@@ -183,6 +188,35 @@ def summary_metrics(name: str, bt: dict) -> dict:
 # Bootstrap dominance vs. OLS-linear baseline
 # ---------------------------------------------------------------------------
 
+def pairwise_dominance_matrix(cost_dict: dict[str, np.ndarray],
+                              n_boot: int = 5000, seed: int = 0) -> pd.DataFrame:
+    """Bootstrap probability that row-model has lower cost than column-model.
+
+    Diagonal entries are 0.5 by convention. The matrix is the formal
+    "hypothesis testing" the proposal §V calls for: for every (OLS_X, IPO_Y)
+    pair we report ``P(cost_row < cost_col)`` over ``n_boot`` paired iid
+    bootstrap resamples on the test-period cost differences.
+    """
+    names = sorted(cost_dict.keys())
+    n_models = len(names)
+    n = min(len(c) for c in cost_dict.values())
+    rng = np.random.default_rng(seed)
+    boot_idx = rng.integers(0, n, size=(n_boot, n))
+
+    M = np.full((n_models, n_models), 0.5)
+    for i, ni in enumerate(names):
+        ci = cost_dict[ni][:n]
+        for j, nj in enumerate(names):
+            if i == j:
+                continue
+            cj = cost_dict[nj][:n]
+            diffs = (ci - cj)[boot_idx]              # (n_boot, n)
+            wins = (diffs.mean(axis=1) < 0).mean()
+            M[i, j] = float(wins)
+
+    return pd.DataFrame(M, index=names, columns=names)
+
+
 def bootstrap_dominance(cand: np.ndarray, base: np.ndarray,
                         n_boot: int = 5000, seed: int = 0) -> dict:
     """Paired stationary bootstrap dominance ratio.
@@ -222,7 +256,7 @@ def linear_coefficients(name: str, summary: dict, d_in: int,
     Returns ``None`` for non-linear predictors.
     """
     family = name.split("_", 1)[1]
-    if family not in ("linear", "ridge"):
+    if family not in ("linear", "ridge", "lasso", "elasticnet"):
         return None
     m = load_model(name, summary, d_in)
     w = m.linear.weight.detach().numpy().reshape(-1)
@@ -282,6 +316,12 @@ def main() -> None:
     out_perf = RESULTS / "performance.csv"
     perf.to_csv(out_perf)
     print(f"wrote {out_perf}")
+
+    # Pairwise bootstrap dominance matrix (proposal §V hypothesis testing).
+    cost_dict = {n: bt["cost"] for n, bt in backtests.items()}
+    pw = pairwise_dominance_matrix(cost_dict)
+    pw.to_csv(RESULTS / "pairwise_dominance.csv")
+    print(f"wrote {RESULTS / 'pairwise_dominance.csv'}")
 
     # Per-month tables for plotting.
     dates_ref = backtests[model_names[0]]["dates"]
