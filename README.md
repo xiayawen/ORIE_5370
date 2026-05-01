@@ -53,7 +53,9 @@ are compared:
 
 - **IPO (decision-focused).** $f$ is trained end-to-end on the realised mean-variance cost
 
-  $\mathcal{L}(\theta)=\frac{1}{T}\sum_t\left[-z^*(\hat y_t)^{\top}y_t+\frac{\delta}{2}z^*(\hat y_t)^{\top}V_tz^*(\hat y_t)\right]$,
+  $\mathcal{L}(\theta)=\frac{1}{T}\sum_t\left[-z^*(\hat y_t)^{\top}y_t\right.$
+
+  $\left.+\frac{\delta}{2}z^*(\hat y_t)^{\top}V_tz^*(\hat y_t)\right]$,
 
   using the closed-form differentiable solution
 
