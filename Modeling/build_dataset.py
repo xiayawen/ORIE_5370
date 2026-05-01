@@ -5,8 +5,7 @@ by ``Project/get_data.ipynb``) and the factor files in ``factor data/``, and
 emits two artefacts in ``data_cache/``:
 
 * ``sp500_filtered.csv`` — the long-format daily panel of price, return, and
-  factor data for the filtered ticker universe (this matches the file the
-  teammate referred to but could not push to GitHub).
+  factor data for the filtered ticker universe.
 * ``panel.npz`` — a per-month dataset of cross-sectional design matrices
   ``X_t``, realized next-month returns ``y_t``, and shrinkage covariance
   estimates ``V_t``. This is what the IPO / OLS models consume.
@@ -58,13 +57,7 @@ def _load_one_ticker(path: Path) -> pd.DataFrame:
 
 
 def build_sp500_filtered() -> pd.DataFrame:
-    """Reproduce the ``sp500_filtered.csv`` build that lives in ``get_data.ipynb``.
-
-    Filtering rule (matching the teammate's note): keep tickers whose first
-    available price is on/before 2005-01-01 *and* whose last price is at or
-    after 2024-01-01, so every name in the filtered universe spans the full
-    sample.
-    """
+    """Reproduce the ``sp500_filtered.csv`` build that lives in ``get_data.ipynb``."""
     files = sorted(PRICE_CACHE.glob("*.csv"))
     if not files:
         raise FileNotFoundError(f"No CSVs in {PRICE_CACHE}. Symlink price_cache/ first.")
@@ -92,10 +85,7 @@ def build_sp500_filtered() -> pd.DataFrame:
     # Daily simple return.
     panel["ret"] = panel.groupby("ticker")["close"].pct_change()
 
-    # Liquidity filter: keep the top ``UNIVERSE_SIZE`` names by median dollar
-    # volume over the full sample. This gives a tractable cross-section
-    # (cov inversion is O(n^3)) while remaining a defensible large-cap
-    # universe.
+    # Liquidity filter
     if UNIVERSE_SIZE is not None and UNIVERSE_SIZE > 0:
         dvol = (panel["close"] * panel["volume"]).groupby(panel["ticker"]).median()
         keep = dvol.sort_values(ascending=False).head(UNIVERSE_SIZE).index
@@ -144,7 +134,6 @@ def _zscore(s: pd.Series) -> pd.Series:
 def add_features(panel: pd.DataFrame) -> pd.DataFrame:
     g = panel.groupby("ticker")
 
-    # Asset-specific features (cross-sectional).
     panel["mom_12_2"] = (
         g["close"].apply(lambda c: c.pct_change(252).shift(21)).reset_index(level=0, drop=True)
     )
@@ -160,15 +149,9 @@ def add_features(panel: pd.DataFrame) -> pd.DataFrame:
 
 
 def cross_sectional_standardise(panel: pd.DataFrame, feat_cols: list[str]) -> pd.DataFrame:
-    """Cross-sectionally z-score each feature within each date.
-
-    This is the standard cross-sectional asset-pricing recipe and matches the
-    project outline (§3.3 Data Preprocessing).
-    """
     out = panel.copy()
     for c in feat_cols:
         out[c] = out.groupby("date")[c].transform(_zscore)
-    # Cross-sectional median imputation for any remaining NaNs.
     for c in feat_cols:
         out[c] = out.groupby("date")[c].transform(lambda s: s.fillna(s.median()))
         out[c] = out[c].fillna(0.0)
@@ -183,45 +166,85 @@ ASSET_FEATURES = ["mom_12_2", "mom_1m", "rev_1d", "vol_60", "log_dollar_vol_60"]
 COMMON_FEATURES = ["Mkt-RF", "SMB", "HML", "RMW", "CMA", "Mom"]
 
 
-def ledoit_wolf_shrinkage(R: np.ndarray) -> np.ndarray:
-    """Linear shrinkage of the sample covariance towards a scaled identity.
-
-    Implements the Ledoit-Wolf (2004) one-parameter shrinker. ``R`` is a
-    ``T × n`` matrix of returns. Returns an ``n × n`` covariance estimate.
+def analytical_nonlinear_shrinkage(R: np.ndarray) -> np.ndarray:
+    """Analytical nonlinear shrinkage of the sample covariance matrix.
+    
+    Implements Ledoit and Wolf (2020) "Analytical Nonlinear Shrinkage of
+    Large-Dimensional Covariance Matrices".
     """
-    T, n = R.shape
-    R = R - R.mean(axis=0, keepdims=True)
-    S = (R.T @ R) / T  # sample covariance (MLE form)
-    mu = np.trace(S) / n
-    F = mu * np.eye(n)
-
-    d2 = np.linalg.norm(S - F, "fro") ** 2
-    # pi_hat = sum of asymptotic variances of S entries
-    R2 = R ** 2
-    pi_mat = (R2.T @ R2) / T - S ** 2
-    pi_hat = pi_mat.sum()
-    kappa = pi_hat / d2 if d2 > 0 else 0.0
-    shrink = max(0.0, min(1.0, kappa / T))
-    return shrink * F + (1 - shrink) * S
+    n, p = R.shape
+    
+    # 1. Compute sample covariance matrix (MLE form)
+    R_centered = R - R.mean(axis=0, keepdims=True)
+    S = (R_centered.T @ R_centered) / n
+    
+    # 2. Spectral decomposition
+    eigenvalues, eigenvectors = np.linalg.eigh(S)
+    
+    # Numerical stability: bound eigenvalues slightly above 0 for edge cases
+    eigenvalues = np.maximum(eigenvalues, 1e-12)
+    
+    # 3. Bandwidth parameters
+    h_n = n ** (-1/3)
+    h_n_j = eigenvalues * h_n
+    
+    f_tilde = np.zeros(p)
+    H_f_tilde = np.zeros(p)
+    
+    sqrt5 = np.sqrt(5.0)
+    pi = np.pi
+    
+    # 4. Estimate spectral density and its Hilbert transform
+    for i in range(p):
+        l_i = eigenvalues[i]
+        diff = l_i - eigenvalues
+        
+        ratio = diff / h_n_j
+        sq_ratio = ratio ** 2
+        
+        # Epanechnikov kernel positive part
+        kernel_part = np.maximum(1.0 - 0.2 * sq_ratio, 0.0)
+        
+        # Spectral density estimator
+        f_tilde[i] = np.mean((3.0 / (4.0 * sqrt5 * h_n_j)) * kernel_part)
+        
+        # Hilbert transform estimator
+        term1 = - (3.0 * diff) / (10.0 * pi * (h_n_j ** 2))
+        term2_coef = (3.0 / (4.0 * sqrt5 * pi * h_n_j)) * kernel_part
+        
+        num = sqrt5 * h_n_j - diff
+        den = sqrt5 * h_n_j + diff
+        
+        with np.errstate(divide='ignore', invalid='ignore'):
+            log_term = np.log(np.abs(num / den))
+        
+        log_term[np.isnan(log_term)] = 0.0 
+        log_term[np.isinf(log_term)] = 0.0
+        
+        H_f_tilde[i] = np.mean(term1 + term2_coef * log_term)
+        
+    # 5. Compute the optimal nonlinear shrinkage formula
+    c = p / n
+    denominator = (pi * c * eigenvalues * f_tilde)**2 + (1.0 - c - pi * c * eigenvalues * H_f_tilde)**2
+    d_tilde = eigenvalues / denominator
+    
+    # 6. Safety conditioning for downstream PyTorch MVO
+    # Because n (60) < p (100), c > 1 and the matrix is theoretically rank-deficient. 
+    # We impose a tiny floor on the eigenvalues so V_t remains strictly invertible.
+    d_tilde = np.maximum(d_tilde, 1e-6)
+    
+    # 7. Recompose the covariance matrix
+    S_tilde = eigenvectors @ np.diag(d_tilde) @ eigenvectors.T
+    
+    return S_tilde
 
 
 def build_panel(panel: pd.DataFrame) -> dict:
-    """Build per-month numpy arrays for the IPO/OLS pipeline.
-
-    Returns a dict with:
-      * dates : np.ndarray of rebalance timestamps (length T)
-      * tickers_per_t : list of ticker arrays (one per t)
-      * X : list of (n_t × d) feature matrices
-      * y : list of (n_t,) realized next-month returns
-      * V : list of (n_t × n_t) covariance estimates (shrinkage)
-      * feature_names : list[str]
-    """
+    """Build per-month numpy arrays for the IPO/OLS pipeline."""
     panel = panel.dropna(subset=["ret"]).sort_values(["date", "ticker"])
 
-    # Returns pivoted to wide form for cov estimation.
     ret_wide = panel.pivot(index="date", columns="ticker", values="ret").sort_index()
 
-    # Find month-end trading days actually observed in the data.
     month_ends = (
         ret_wide.index.to_series()
         .groupby(ret_wide.index.to_period("M"))
@@ -248,21 +271,18 @@ def build_panel(panel: pd.DataFrame) -> dict:
         loc = all_dates.get_loc(t)
         if loc < COV_WINDOW:
             continue
-        # Feature row for time t (already standardised cross-sectionally).
         try:
             cs = panel_idx.loc[t]
         except KeyError:
             continue
         cs = cs.dropna(subset=feat_cols)
-        if len(cs) < 30:  # need a minimum cross-section
+        if len(cs) < 30: 
             continue
 
-        # Realized next-month return (geometric over next-month trading days).
         next_month_ends = month_ends[i + 1] if i + 1 < len(month_ends) else None
         if next_month_ends is None:
             continue
         win = ret_wide.loc[(all_dates > t) & (all_dates <= next_month_ends)]
-        # Compound to monthly return.
         next_ret = (1.0 + win).prod(axis=0) - 1.0
         next_ret = next_ret.reindex(cs.index)
         valid = next_ret.notna()
@@ -271,11 +291,10 @@ def build_panel(panel: pd.DataFrame) -> dict:
         if len(cs) < 30:
             continue
 
-        # Covariance from the trailing COV_WINDOW daily returns of those tickers.
         R_window = ret_wide.iloc[loc - COV_WINDOW + 1 : loc + 1][cs.index].fillna(0.0).to_numpy()
-        # Convert daily covariance to *monthly* by ~21-day scaling so it lives
-        # in the same units as the realized monthly return.
-        V = ledoit_wolf_shrinkage(R_window) * 21.0
+        
+        # Apply the new Analytical Nonlinear Shrinkage
+        V = analytical_nonlinear_shrinkage(R_window) * 21.0
 
         out_dates.append(t)
         out_tickers.append(cs.index.to_numpy())
@@ -298,7 +317,6 @@ def build_panel(panel: pd.DataFrame) -> dict:
 # ---------------------------------------------------------------------------
 
 def save_panel(panel: dict, path: Path) -> None:
-    """Save the variable-shape per-month arrays as a single .npz."""
     flat = {}
     flat["dates"] = panel["dates"].astype("datetime64[ns]")
     flat["feature_names"] = np.array(panel["feature_names"])
