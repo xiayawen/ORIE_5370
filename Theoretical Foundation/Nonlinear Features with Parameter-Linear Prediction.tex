@@ -1,0 +1,205 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+
+\title{ORIE 5370}
+
+\begin{document}
+
+\maketitle
+
+\section{Extending Linear IPO to Nonlinear IPO}
+
+\subsection{Motivation}
+
+The original integrated prediction and optimization (IPO) framework considers a linear prediction model for expected asset returns and optimizes the prediction parameters directly with respect to downstream mean-variance portfolio performance. This is attractive because it aligns the training objective with the final investment decision rather than with a standalone prediction loss.
+
+However, linear predictors may be too restrictive in practice. Asset returns often depend on features in a nonlinear manner, through interactions, higher-order effects, or more flexible latent representations. Therefore, a natural extension is to replace the linear return predictor with a nonlinear function while preserving the decision-focused IPO objective. This leads to a nonlinear IPO formulation.
+
+There are two conceptually distinct routes to nonlinear IPO:
+\begin{enumerate}
+    \item \textbf{Nonlinear in inputs but linear in parameters:} use a nonlinear feature map $\phi(x)$ and define the predictor as a linear model in the transformed features.
+    \item \textbf{Fully nonlinear in parameters:} use a neural network, kernel model, or another differentiable nonlinear predictor $f(x;\theta)$.
+\end{enumerate}
+
+The first route preserves much of the analytical structure of the original IPO formulation, while the second generally requires gradient-based optimization through the downstream portfolio problem.
+
+\subsection{General Nonlinear IPO Formulation}
+
+Let $x \in \mathbb{R}^{d_x}$ denote the input features and let $y \in \mathbb{R}^{d_y}$ denote the realized asset returns. We consider a general predictor
+\[
+\hat y = f(x;\theta),
+\]
+where $\theta$ denotes the model parameters.
+
+For each observation $i=1,\dots,m$, the downstream portfolio decision is obtained by solving a mean-variance optimization problem using the predicted returns $\hat y_i = f(x_i;\theta)$. The nonlinear IPO problem is
+\begin{equation}
+\min_{\theta} \; \frac{1}{m}\sum_{i=1}^{m} c\!\left(z_i^*(f(x_i;\theta)),\, y_i\right)
+\label{eq:nonlinear_ipo_outer}
+\end{equation}
+subject to
+\begin{equation}
+z_i^*(\hat y_i)
+=
+\arg\min_{z \in S}
+\left(
+-z^\top \hat y_i
++ \frac{\delta}{2} z^\top \hat V_i z
+\right),
+\label{eq:nonlinear_ipo_inner}
+\end{equation}
+where $\delta > 0$ is the risk-aversion parameter, $\hat V_i$ is the estimated covariance matrix, and $S$ denotes the feasible set of portfolio weights.
+
+The realized downstream cost is
+\begin{equation}
+c(z,y)
+=
+-z^\top y + \frac{\delta}{2} z^\top V z,
+\label{eq:realized_cost}
+\end{equation}
+where $V$ is the true covariance matrix (or an out-of-sample proxy).
+
+\subsection{Route I: Nonlinear Features with Parameter-Linear Prediction}
+
+A natural extension is to introduce a nonlinear feature map
+\[
+\phi(x) \in \mathbb{R}^{p},
+\]
+and define the prediction model as
+\begin{equation}
+\hat y = W \phi(x) + b.
+\label{eq:feature_model}
+\end{equation}
+Examples include polynomial expansions, interaction terms, spline bases, radial basis features, or other engineered nonlinear transformations.
+
+To simplify notation, augment the feature vector with a constant:
+\[
+\tilde \phi(x)
+=
+\begin{bmatrix}
+\phi(x) \\
+1
+\end{bmatrix},
+\qquad
+\hat y = \Theta^\top \tilde \phi(x),
+\]
+where $\Theta$ stacks $W$ and $b$.
+
+Although the predictor is nonlinear in the original inputs $x$, it remains linear in the parameters $\Theta$. Therefore, the analytical structure of the original linear IPO framework can be preserved after replacing $x$ with $\phi(x)$.
+
+\subsection{Unconstrained Mean-Variance Problem}
+
+We first consider the unconstrained case $S=\mathbb{R}^{d_y}$. The inner problem becomes
+\[
+z_i^*(\hat y_i)
+=
+\arg\min_{z}
+\left(
+-z^\top \hat y_i + \frac{\delta}{2} z^\top \hat V_i z
+\right).
+\]
+The first-order condition is
+\[
+-\hat y_i + \delta \hat V_i z = 0,
+\]
+which implies
+\begin{equation}
+z_i^*(\hat y_i)
+=
+\frac{1}{\delta}\hat V_i^{-1}\hat y_i.
+\label{eq:unconstrained_optimal_z}
+\end{equation}
+
+Substituting the parameter-linear nonlinear predictor $\hat y_i=\Theta^\top \tilde\phi_i$ into \eqref{eq:unconstrained_optimal_z}, we obtain
+\[
+z_i^*(\Theta)
+=
+\frac{1}{\delta}\hat V_i^{-1}\Theta^\top \tilde\phi_i.
+\]
+
+The realized cost for sample $i$ is
+\[
+\ell_i(\Theta)
+=
+-z_i^{*\top} y_i
++\frac{\delta}{2} z_i^{*\top} V_i z_i^*.
+\]
+Substituting $z_i^*(\Theta)$ gives
+\begin{align}
+\ell_i(\Theta)
+&=
+-\frac{1}{\delta}\tilde\phi_i^\top \Theta \hat V_i^{-1} y_i
++
+\frac{1}{2\delta}
+\tilde\phi_i^\top
+\Theta \hat V_i^{-1} V_i \hat V_i^{-1}
+\Theta^\top \tilde\phi_i.
+\label{eq:loss_theta_unconstrained}
+\end{align}
+
+Therefore, the full nonlinear-feature IPO objective is
+\begin{equation}
+L(\Theta)
+=
+\frac{1}{m}\sum_{i=1}^m \ell_i(\Theta),
+\label{eq:full_loss_unconstrained}
+\end{equation}
+which is a quadratic function of $\Theta$. Hence, this extension remains analytically tractable and can be solved as a convex quadratic optimization problem, or equivalently as a generalized normal equation system.
+
+This shows that \emph{nonlinearity in the input space does not destroy the analytical IPO structure as long as the predictor remains linear in its parameters}.
+
+\subsection{Equality-Constrained Mean-Variance Problem}
+
+Next, suppose the feasible set is defined by linear equality constraints,
+\[
+S = \{ z : Az = b \}.
+\]
+Using a null-space parameterization, any feasible portfolio can be written as
+\[
+z = Fq + z_0,
+\]
+where the columns of $F$ span the null space of $A$, i.e.\ $AF=0$, and $z_0$ is any feasible point satisfying $Az_0=b$.
+
+Substituting into the inner problem yields an optimization problem in $q$. The optimal decision can be expressed as
+\begin{equation}
+z_i^*(\hat y_i)
+=
+\frac{1}{\delta}
+F(F^\top \hat V_i F)^{-1}F^\top \hat y_i
++
+\left(
+I - F(F^\top \hat V_i F)^{-1}F^\top \hat V_i
+\right)z_0.
+\label{eq:equality_solution}
+\end{equation}
+
+Define
+\[
+B_i
+=
+\frac{1}{\delta}F(F^\top \hat V_i F)^{-1}F^\top,
+\qquad
+a_i
+=
+\left(
+I - F(F^\top \hat V_i F)^{-1}F^\top \hat V_i
+\right)z_0.
+\]
+Then
+\begin{equation}
+z_i^*(\hat y_i)=B_i \hat y_i + a_i.
+\label{eq:affine_decision_rule}
+\end{equation}
+
+Substituting $\hat y_i=\Theta^\top \tilde\phi_i$ into \eqref{eq:affine_decision_rule}, the decision becomes affine in $\Theta$. The sample loss is
+\[
+\ell_i(\Theta)
+=
+-(B_i\Theta^\top \tilde\phi_i + a_i)^\top y_i
++\frac{\delta}{2}(B_i\Theta^\top \tilde\phi_i + a_i)^\top
+V_i
+(B_i\Theta^\top \tilde\phi_i + a_i).
+\]
+Again, this is quadratic in $\Theta$, so the nonlinear-feature IPO formulation remains analytically solvable in the equality-constrained case.
+
+
+\end{document}
