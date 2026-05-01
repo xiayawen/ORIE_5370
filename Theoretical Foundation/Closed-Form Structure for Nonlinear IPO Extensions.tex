@@ -755,12 +755,127 @@ Neural Network
 
 \subsection{Covariance estimation}
 
-At each monthly rebalance date \(t\), the covariance matrix \(V_t\) is estimated
-from the trailing 60 daily returns of the assets in the current cross-section.
-Because the cross-section is large relative to the estimation window, we use a
-Ledoit--Wolf linear shrinkage estimator toward a scaled identity matrix. The
-resulting daily covariance estimate is multiplied by 21 so that it is expressed
-in the same monthly units as the realized next-month return \(y_t\).
+At each monthly rebalance date \(t\), the MVO decision requires a covariance
+matrix \(V_t\) whose units are consistent with the realized next-month return
+vector \(y_t\). Since \(y_t\) is measured at the monthly horizon, we estimate a
+daily covariance matrix from recent daily returns and then rescale it to a
+monthly covariance matrix.
+
+Let \(r_{\tau}\in \mathbb R^{n_t}\) denote the vector of daily returns for the
+assets in the cross-section at rebalance date \(t\), where \(n_t\) is the
+number of available assets at that rebalance. We use a trailing window of
+\(L=60\) trading days:
+\[
+\mathcal W_t = \{t-L+1,\ldots,t\}.
+\]
+Stacking the demeaned daily returns over this window gives
+\[
+R_t =
+\begin{bmatrix}
+(r_{t-L+1}-\bar r_t)^\top \\
+(r_{t-L+2}-\bar r_t)^\top \\
+\vdots \\
+(r_t-\bar r_t)^\top
+\end{bmatrix}
+\in \mathbb R^{L\times n_t},
+\]
+where
+\[
+\bar r_t = \frac{1}{L}\sum_{\tau\in \mathcal W_t} r_\tau.
+\]
+
+The raw sample covariance estimator is
+\[
+S_t
+=
+\frac{1}{L}R_t^\top R_t.
+\]
+However, in our setting \(n_t\) is large relative to the rolling window length
+\(L\). For example, the empirical implementation uses approximately \(n_t=100\)
+assets and only \(L=60\) daily observations. The sample covariance matrix
+\(S_t\) can therefore be ill-conditioned or unstable, which is especially
+problematic because the MVO solution requires solving linear systems involving
+\(V_t\).
+
+To stabilize the covariance estimate, we use a Ledoit--Wolf style linear
+shrinkage estimator toward a scaled identity matrix. Define the shrinkage
+target
+\[
+F_t = \mu_t I_{n_t},
+\qquad
+\mu_t = \frac{1}{n_t}\operatorname{tr}(S_t).
+\]
+Here, \(F_t\) preserves the average variance level of the sample covariance but
+removes noisy off-diagonal correlation estimates. The shrinkage covariance is
+then
+\[
+\widehat{\Sigma}^{\,\mathrm{daily}}_t
+=
+\rho_t F_t + (1-\rho_t)S_t,
+\qquad
+\rho_t\in[0,1].
+\]
+When \(\rho_t=0\), the estimator reduces to the sample covariance \(S_t\).
+When \(\rho_t=1\), the estimator becomes the scaled identity target \(F_t\).
+Intermediate values trade off sample correlation information against numerical
+stability.
+
+In the implementation, the shrinkage intensity is computed from the data. Let
+\[
+d_t^2 = \|S_t - F_t\|_F^2
+\]
+measure the squared Frobenius distance between the sample covariance and the
+target. The code estimates the total variance of the sample covariance entries
+by
+\[
+\pi_t
+=
+\sum_{i=1}^{n_t}\sum_{j=1}^{n_t}
+\left[
+\frac{1}{L}\sum_{\tau\in\mathcal W_t}
+\tilde r_{\tau,i}^2 \tilde r_{\tau,j}^2
+-
+(S_t)_{ij}^2
+\right],
+\]
+where
+\[
+\tilde r_{\tau} = r_{\tau}-\bar r_t.
+\]
+The shrinkage intensity is then clipped to the unit interval:
+\[
+\rho_t
+=
+\min\left\{
+1,\,
+\max\left\{
+0,\,
+\frac{\pi_t}{L d_t^2}
+\right\}
+\right\}.
+\]
+This produces a well-conditioned covariance estimate even when the rolling
+window is short relative to the number of assets.
+
+Finally, because the covariance estimate above is based on daily returns while
+the realized return vector \(y_t\) is a next-month return, we rescale the daily
+covariance to a monthly horizon:
+\[
+V_t
+=
+21\widehat{\Sigma}^{\,\mathrm{daily}}_t.
+\]
+The factor 21 approximates the number of trading days in one month. This
+rescaling ensures that the two terms in the MVO objective,
+\[
+-z^\top \hat y_t
+\qquad\text{and}\qquad
+\frac{\delta}{2}z^\top V_t z,
+\]
+are expressed in compatible monthly units. Thus, at each rebalance date, the
+portfolio weights are computed using the estimated monthly covariance matrix
+\(V_t\), the predicted next-month return vector \(\hat y_t\), and the fixed
+risk-aversion parameter \(\delta\).
 
 \subsection{Limitations of the analytical structure}
 
