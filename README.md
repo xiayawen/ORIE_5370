@@ -39,12 +39,8 @@ This study addresses three sub-questions:
 
 ## 2. Methodology
 
-We solve the equality-constrained mean-variance program
-
-$$
-\min_{z \in \mathbb{R}^n}\; -z^{\top} y \,+\, \tfrac{\delta}{2}\, z^{\top} V z
-\quad\text{s.t.}\quad \mathbf{1}^{\top} z = 1
-$$
+We solve the equality-constrained mean-variance program  
+$\min_{z \in \mathbb{R}^n}\; -z^{\top}y + \frac{\delta}{2}z^{\top}Vz \quad \text{s.t.}\quad \mathbf{1}^{\top}z=1$
 
 with risk-aversion parameter $\delta = 50$ (matching Butler & Kwon § 4) and
 a 60-day Ledoit–Wolf-shrunk sample covariance $V$. Two training paradigms
@@ -56,30 +52,10 @@ are compared:
   program above.
 
 - **IPO (decision-focused).** $f$ is trained end-to-end on the realised
-  mean-variance cost
-
-$$
-\mathcal L(\theta)
-=
-\tfrac{1}{T} \sum_t
-\big[
--z^*(\hat y_t)^{\top} y_t
-+
-\tfrac{\delta}{2}\,
-z^*(\hat y_t)^{\top} V_t z^*(\hat y_t)
-\big],
-$$
-
-  using the closed-form differentiable solution
-
-$$
-z^*(\hat y_t)
-=
-\tfrac{1}{\delta}
-V_t^{-1}
-(\hat y_t - \lambda_t \mathbf{1})
-$$
-
+  mean-variance cost  
+  $\mathcal L(\theta)=\frac{1}{T}\sum_t[-z^*(\hat y_t)^{\top}y_t+\frac{\delta}{2}z^*(\hat y_t)^{\top}V_tz^*(\hat y_t)]$,  
+  using the closed-form differentiable solution  
+  $z^*(\hat y_t)=\frac{1}{\delta}V_t^{-1}(\hat y_t-\lambda_t\mathbf{1})$,  
   so the entire pipeline is autodifferentiable in PyTorch without a QP layer.
 
 Seven predictor families are evaluated under both paradigms (14 model ×
@@ -87,13 +63,13 @@ paradigm combinations in total):
 
 | Family | Functional form | Penalty (training) |
 |---|---|---|
-| Linear      | $W x + b$ | none |
-| Ridge       | $W x + b$ | $\lambda \lVert W \rVert_2^2$ |
-| Lasso       | $W x + b$ | $\lambda \lVert W \rVert_1$ |
-| Elastic Net | $W x + b$ | $\lambda_1 \lVert W \rVert_1 + \lambda_2 \lVert W \rVert_2^2$ |
-| Polynomial  | $W \phi(x) + b$, $\phi$ adds squares + interactions | none |
-| Kernel ridge | $\sum \alpha_m K(x, x_m)$, RBF kernel, $M = 200$ | $\lambda \lVert \alpha \rVert_2^2$ |
-| MLP (1 hidden layer) | $W_2 \tanh(W_1 x + b_1) + b_2$ | $\lambda \lVert \theta \rVert_2^2$ |
+| Linear | $Wx+b$ | none |
+| Ridge | $Wx+b$ | $\lambda\lVert W\rVert_2^2$ |
+| Lasso | $Wx+b$ | $\lambda\lVert W\rVert_1$ |
+| Elastic Net | $Wx+b$ | $\lambda_1\lVert W\rVert_1+\lambda_2\lVert W\rVert_2^2$ |
+| Polynomial | $W\phi(x)+b$, $\phi$ adds squares + interactions | none |
+| Kernel ridge | $\sum_m \alpha_m K(x,x_m)$, RBF kernel, $M=200$ | $\lambda\lVert\alpha\rVert_2^2$ |
+| MLP (1 hidden layer) | $W_2\tanh(W_1x+b_1)+b_2$ | $\lambda\lVert\theta\rVert_2^2$ |
 
 Hyperparameters (ridge $\lambda$, Lasso $\alpha$, elastic-net mix, kernel
 $\gamma$, NN hidden width, IPO weight decay, IPO L1 penalty) are selected
@@ -102,285 +78,70 @@ on a validation period by minimum realised MVO cost.
 ### Analytical structure of the IPO extensions
 
 The equality-constrained MVO layer is closed-form for every predictor because
-the optimal portfolio depends only on the predicted return vector:
-
-$$
-z_t^*(\hat y_t) = B_t \hat y_t + a_t
-$$
-
-where
-
-$$
-B_t =
-\frac{1}{\delta}
-\left[
-V_t^{-1}
--
-\frac{
-V_t^{-1}\mathbf{1}\mathbf{1}^{\top}V_t^{-1}
-}{
-\mathbf{1}^{\top}V_t^{-1}\mathbf{1}
-}
-\right]
-$$
-
-and
-
-$$
-a_t =
-\frac{
-V_t^{-1}\mathbf{1}
-}{
-\mathbf{1}^{\top}V_t^{-1}\mathbf{1}
-}
-$$
+the optimal portfolio depends only on the predicted return vector:  
+$z_t^*(\hat y_t)=B_t\hat y_t+a_t$, where  
+$B_t=\frac{1}{\delta}\left[V_t^{-1}-\frac{V_t^{-1}\mathbf{1}\mathbf{1}^{\top}V_t^{-1}}{\mathbf{1}^{\top}V_t^{-1}\mathbf{1}}\right]$ and  
+$a_t=\frac{V_t^{-1}\mathbf{1}}{\mathbf{1}^{\top}V_t^{-1}\mathbf{1}}$.
 
 This affine structure lets us characterize the IPO estimator for each
 predictor class.
 
-For a parameter-linear predictor,
+For a parameter-linear predictor, $\hat y_t=X_t\beta$, substituting
+$z_t^*(\hat y_t)=B_tX_t\beta+a_t$ into the realised MVO cost gives  
+$\mathcal L(\beta)=\frac{1}{2}\beta^\top H\beta-g^\top\beta+\text{penalty}(\beta)$,  
+where  
+$H=\delta\sum_t X_t^\top B_t^\top V_tB_tX_t$ and  
+$g=\sum_t X_t^\top B_t^\top(y_t-\delta V_ta_t)$.
 
-$$
-\hat y_t = X_t \beta
-$$
+Therefore, the Ridge IPO estimator has the closed-form solution  
+$\hat\beta_{\mathrm{Ridge\ IPO}}=(H+\lambda I)^{-1}g$.
 
-substituting $z_t^*(\hat y_t)=B_tX_t\beta+a_t$ into the realised MVO cost gives
-
-$$
-\mathcal L(\beta)
-=
-\frac{1}{2}\beta^\top H\beta
--
-g^\top\beta
-+
-\text{penalty}(\beta)
-$$
-
-where
-
-$$
-H =
-\delta
-\sum_t
-X_t^\top B_t^\top V_t B_t X_t
-$$
-
-and
-
-$$
-g =
-\sum_t
-X_t^\top B_t^\top
-\left(
-y_t-\delta V_t a_t
-\right)
-$$
-
-Therefore, the Ridge IPO estimator has the closed-form solution
-
-$$
-\hat\beta_{\mathrm{Ridge\ IPO}}
-=
-(H+\lambda I)^{-1}g
-$$
-
-For Lasso IPO, the $L_1$ penalty makes the objective convex but nonsmooth:
-
-$$
-\hat\beta_{\mathrm{Lasso\ IPO}}
-=
-\arg\min_{\beta}
-\left\{
-\frac{1}{2}\beta^\top H\beta
--
-g^\top\beta
-+
-\lambda\|\beta\|_1
-\right\}
-$$
+For Lasso IPO, the $L_1$ penalty makes the objective convex but nonsmooth:  
+$\hat\beta_{\mathrm{Lasso\ IPO}}=\arg\min_{\beta}\left\{\frac{1}{2}\beta^\top H\beta-g^\top\beta+\lambda\lVert\beta\rVert_1\right\}$.
 
 It does not have a simple matrix-inverse solution in general, but it is
-characterized by the KKT condition
+characterized by the KKT condition  
+$0\in H\hat\beta-g+\lambda\partial\lVert\hat\beta\rVert_1$.
 
-$$
-0
-\in
-H\hat\beta
--
-g
-+
-\lambda \partial \|\hat\beta\|_1
-$$
+Equivalently, componentwise,  
+$(H\hat\beta-g)_j=-\lambda\operatorname{sign}(\hat\beta_j)$ if $\hat\beta_j\neq0$, and  
+$|(H\hat\beta-g)_j|\leq\lambda$ if $\hat\beta_j=0$.
 
-Equivalently, componentwise,
+Elastic Net IPO has the same nonsmooth structure after adding the $L_2$ term:  
+$\hat\beta_{\mathrm{EN\ IPO}}=\arg\min_{\beta}\left\{\frac{1}{2}\beta^\top(H+\lambda_2I)\beta-g^\top\beta+\lambda_1\lVert\beta\rVert_1\right\}$,  
+with KKT condition  
+$0\in(H+\lambda_2I)\hat\beta-g+\lambda_1\partial\lVert\hat\beta\rVert_1$.
 
-$$
-(H\hat\beta-g)_j
-=
--\lambda\,\operatorname{sign}(\hat\beta_j)
-\quad
-\text{if } \hat\beta_j\neq 0
-$$
-
-and
-
-$$
-|(H\hat\beta-g)_j|
-\leq
-\lambda
-\quad
-\text{if } \hat\beta_j=0
-$$
-
-Elastic Net IPO has the same nonsmooth structure after adding the $L_2$ term:
-
-$$
-\hat\beta_{\mathrm{EN\ IPO}}
-=
-\arg\min_{\beta}
-\left\{
-\frac{1}{2}\beta^\top(H+\lambda_2 I)\beta
--
-g^\top\beta
-+
-\lambda_1\|\beta\|_1
-\right\}
-$$
-
-with KKT condition
-
-$$
-0
-\in
-(H+\lambda_2 I)\hat\beta
--
-g
-+
-\lambda_1\partial\|\hat\beta\|_1
-$$
-
-When $\lambda_1=0$, Elastic Net reduces to Ridge IPO and has the closed form
-
-$$
-\hat\beta
-=
-(H+\lambda_2 I)^{-1}g
-$$
+When $\lambda_1=0$, Elastic Net reduces to Ridge IPO and has the closed form  
+$\hat\beta=(H+\lambda_2I)^{-1}g$.
 
 Polynomial IPO also has a closed-form structure because the predictor is
 nonlinear in the features but linear in the parameters. If
+$\hat y_t=\Phi_t\beta$ and $\Phi_t=\phi(X_t)$, then replacing $X_t$ by
+$\Phi_t$ gives  
+$H_{\phi}=\delta\sum_t\Phi_t^\top B_t^\top V_tB_t\Phi_t$ and  
+$g_{\phi}=\sum_t\Phi_t^\top B_t^\top(y_t-\delta V_ta_t)$,  
+so the polynomial IPO solution is  
+$\hat\beta_{\mathrm{Poly\ IPO}}=H_{\phi}^{-1}g_{\phi}$.
 
-$$
-\hat y_t=\Phi_t\beta,
-\qquad
-\Phi_t=\phi(X_t)
-$$
-
-then replacing $X_t$ by $\Phi_t$ gives
-
-$$
-H_{\phi}
-=
-\delta
-\sum_t
-\Phi_t^\top B_t^\top V_t B_t \Phi_t
-$$
-
-and
-
-$$
-g_{\phi}
-=
-\sum_t
-\Phi_t^\top B_t^\top
-\left(
-y_t-\delta V_t a_t
-\right)
-$$
-
-so the polynomial IPO solution is
-
-$$
-\hat\beta_{\mathrm{Poly\ IPO}}
-=
-H_{\phi}^{-1}g_{\phi}
-$$
-
-With an $L_2$ penalty, this becomes
-
-$$
-\hat\beta_{\mathrm{Poly\ Ridge\ IPO}}
-=
-(H_{\phi}+\lambda I)^{-1}g_{\phi}
-$$
+With an $L_2$ penalty, this becomes  
+$\hat\beta_{\mathrm{Poly\ Ridge\ IPO}}=(H_{\phi}+\lambda I)^{-1}g_{\phi}$.
 
 Finite-kernel IPO has the same structure when the anchor points are fixed. With
-
-$$
-\hat y_t
-=
-\widetilde K_t\widetilde\alpha
-$$
-
-the IPO objective is quadratic in $\widetilde\alpha$. With kernel-ridge
-regularization matrix $D$, the closed-form solution is
-
-$$
-\hat{\widetilde\alpha}_{\mathrm{Kernel\ IPO}}
-=
-(H_K+\lambda D)^{-1}g_K
-$$
-
-where
-
-$$
-H_K
-=
-\delta
-\sum_t
-\widetilde K_t^\top B_t^\top V_t B_t \widetilde K_t
-$$
-
-and
-
-$$
-g_K
-=
-\sum_t
-\widetilde K_t^\top B_t^\top
-\left(
-y_t-\delta V_t a_t
-\right)
-$$
+$\hat y_t=\widetilde K_t\widetilde\alpha$, the IPO objective is quadratic in
+$\widetilde\alpha$. With kernel-ridge regularization matrix $D$, the closed-form
+solution is  
+$\hat{\widetilde\alpha}_{\mathrm{Kernel\ IPO}}=(H_K+\lambda D)^{-1}g_K$,  
+where  
+$H_K=\delta\sum_t\widetilde K_t^\top B_t^\top V_tB_t\widetilde K_t$ and  
+$g_K=\sum_t\widetilde K_t^\top B_t^\top(y_t-\delta V_ta_t)$.
 
 Finally, neural-network IPO does not admit a closed-form estimator because
-$f(X_t;\theta)$ is nonlinear in $\theta$. In this case we solve
-
-$$
-\hat\theta_{\mathrm{NN\ IPO}}
-=
-\arg\min_{\theta}
-\frac{1}{T}
-\sum_t
-\left[
--
-\left(B_tf(X_t;\theta)+a_t\right)^\top y_t
-+
-\frac{\delta}{2}
-\left(B_tf(X_t;\theta)+a_t\right)^\top
-V_t
-\left(B_tf(X_t;\theta)+a_t\right)
-\right]
-$$
-
+$f(X_t;\theta)$ is nonlinear in $\theta$. In this case we solve  
+$\hat\theta_{\mathrm{NN\ IPO}}=\arg\min_{\theta}\frac{1}{T}\sum_t[-(B_tf(X_t;\theta)+a_t)^\top y_t+\frac{\delta}{2}(B_tf(X_t;\theta)+a_t)^\top V_t(B_tf(X_t;\theta)+a_t)]$  
 by gradient descent. The gradient is computed through the differentiable MVO
-layer, using
-
-$$
-\frac{\partial z_t^*}{\partial \hat y_t}
-=
-B_t
-$$
+layer, using  
+$\frac{\partial z_t^*}{\partial\hat y_t}=B_t$.
 
 Thus, Ridge, polynomial, and fixed-anchor kernel IPO have closed-form
 matrix-inverse solutions; Lasso and Elastic Net have convex nonsmooth KKT
@@ -394,7 +155,7 @@ The resulting analytical classification is summarized below:
 | Linear | No | Yes | Yes |
 | Ridge | No | Yes | Yes |
 | Lasso | No | Yes | No, due to $L_1$ nonsmoothness |
-| Elastic Net | No | Yes | No, unless $\lambda_1 = 0$ |
+| Elastic Net | No | Yes | No, unless $\lambda_1=0$ |
 | Polynomial | Yes | Yes | Yes |
 | Finite Kernel Ridge | Yes | Yes, if anchors fixed | Yes |
 | Neural Network | Yes | No | No |
