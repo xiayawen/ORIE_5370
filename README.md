@@ -82,76 +82,99 @@ on a validation period by minimum realised MVO cost.
 
 ### Analytical structure of the IPO extensions
 
-The equality-constrained MVO layer is closed-form for every predictor because
-the optimal portfolio depends only on the predicted return vector:  
-$z_t^*(\hat y_t)=B_t\hat y_t+a_t$, where  
-$B_t=\frac{1}{\delta}\left[V_t^{-1}-\frac{V_t^{-1}\mathbf{1}\mathbf{1}^{\top}V_t^{-1}}{\mathbf{1}^{\top}V_t^{-1}\mathbf{1}}\right]$ and  
-$a_t=\frac{V_t^{-1}\mathbf{1}}{\mathbf{1}^{\top}V_t^{-1}\mathbf{1}}$.
+The equality-constrained MVO layer is closed-form for every predictor because the optimal portfolio depends only on the predicted return vector $z_t^*(\hat{y}_t)=B_t\hat{y}_t+a_t$, where
 
-This affine structure lets us characterize the IPO estimator for each
-predictor class.
+$$
+B_t=\frac{1}{\delta}\left[V_t^{-1}-\frac{V_t^{-1}\mathbf{1}\mathbf{1}^{\top}V_t^{-1}}{\mathbf{1}^{\top}V_t^{-1}\mathbf{1}}\right], \qquad
+a_t=\frac{V_t^{-1}\mathbf{1}}{\mathbf{1}^{\top}V_t^{-1}\mathbf{1}}.
+$$
 
-For a parameter-linear predictor, $\hat y_t=X_t\beta$, substituting
-$z_t^*(\hat y_t)=B_tX_t\beta+a_t$ into the realised MVO cost gives  
-$\mathcal L(\beta)=\frac{1}{2}\beta^\top H\beta-g^\top\beta+\text{penalty}(\beta)$,  
-where  
-$H=\delta\sum_t X_t^\top B_t^\top V_tB_tX_t$ and  
-$g=\sum_t X_t^\top B_t^\top(y_t-\delta V_ta_t)$.
+This affine structure lets us characterize the IPO estimator for each predictor class.
 
-Therefore, the Ridge IPO estimator has the closed-form solution  
-$\hat\beta_{\text{Ridge IPO}}=(H+\lambda I)^{-1}g$.
+---
 
-For Lasso IPO, the $L_1$ penalty makes the objective convex but nonsmooth:
+**Parameter-linear predictor** $\hat{y}_t=X_t\beta$: substituting $z_t^*=B_tX_t\beta+a_t$ into the realised MVO cost gives
 
-$$\hat\beta_{\text{Lasso IPO}}=\arg\min_{\beta}\,\frac{1}{2}\beta^\top H\beta-g^\top\beta+\lambda\|\beta\|_1$$
+$$
+\mathcal{L}(\beta)=\frac{1}{2}\beta^\top H\beta-g^\top\beta+\text{penalty}(\beta),
+$$
 
-It does not have a simple matrix-inverse solution in general, but it is
-characterized by the KKT condition  
-$0\in H\hat\beta-g+\lambda\partial\|\hat\beta\|_1$.
+where
 
-Equivalently, componentwise,  
-$(H\hat\beta-g)_j=-\lambda\text{sign}(\hat\beta_j)$ if $\hat\beta_j\neq0$, and  
-$|(H\hat\beta-g)_j|\leq\lambda$ if $\hat\beta_j=0$.
+$$
+H=\delta\sum_t X_t^\top B_t^\top V_tB_tX_t, \qquad
+g=\sum_t X_t^\top B_t^\top(y_t-\delta V_ta_t).
+$$
 
-Elastic Net IPO has the same nonsmooth structure after adding the $L_2$ term:
+**Ridge IPO** has the closed-form solution
 
-$$\hat\beta_{\text{EN IPO}}=\arg\min_{\beta}\,\frac{1}{2}\beta^\top(H+\lambda_2 I)\beta-g^\top\beta+\lambda_1\|\beta\|_1$$
+$$
+\hat\beta_{\text{Ridge IPO}}=(H+\lambda I)^{-1}g.
+$$
 
-with KKT condition  
-$0\in(H+\lambda_2I)\hat\beta-g+\lambda_1\partial\|\hat\beta\|_1$.
+**Lasso IPO** — the $L_1$ penalty makes the objective convex but nonsmooth:
 
-When $\lambda_1=0$, Elastic Net reduces to Ridge IPO and has the closed form  
-$\hat\beta=(H+\lambda_2I)^{-1}g$.
+$$
+\hat\beta_{\text{Lasso IPO}}=\arg\min_{\beta}\,\frac{1}{2}\beta^\top H\beta-g^\top\beta+\lambda\|\beta\|_1.
+$$
 
-Polynomial IPO also has a closed-form structure because the predictor is
-nonlinear in the features but linear in the parameters. If
-$\hat y_t=\Phi_t\beta$ and $\Phi_t=\phi(X_t)$, then replacing $X_t$ by
-$\Phi_t$ gives  
-$H_{\phi}=\delta\sum_t\Phi_t^\top B_t^\top V_tB_t\Phi_t$ and  
-$g_{\phi}=\sum_t\Phi_t^\top B_t^\top(y_t-\delta V_ta_t)$,  
-so the polynomial IPO solution is  
-$\hat\beta_{\text{Poly IPO}}=H_{\phi}^{-1}g_{\phi}$.
+There is no matrix-inverse solution in general; the KKT conditions are
 
-With an $L_2$ penalty, this becomes  
-$\hat\beta_{\text{Poly Ridge IPO}}=(H_{\phi}+\lambda I)^{-1}g_{\phi}$.
+$$
+\begin{aligned}
+(H\hat\beta-g)_j &= -\lambda\,\text{sign}(\hat\beta_j) & &\text{if } \hat\beta_j\neq 0,\\
+|(H\hat\beta-g)_j| &\leq \lambda & &\text{if } \hat\beta_j=0.
+\end{aligned}
+$$
 
-Finite-kernel IPO has the same structure when the anchor points are fixed. With
-$\hat y_t=\tilde K_t\tilde\alpha$, the IPO objective is quadratic in
-$\tilde\alpha$. With kernel-ridge regularization matrix $D$, the closed-form
-solution is  
-$\hat{\tilde\alpha}_{\text{Kernel IPO}}=(H_K+\lambda D)^{-1}g_K$,  
-where  
-$H_K=\delta\sum_t\tilde K_t^\top B_t^\top V_tB_t\tilde K_t$ and  
-$g_K=\sum_t\tilde K_t^\top B_t^\top(y_t-\delta V_ta_t)$.
+**Elastic Net IPO** adds an $L_2$ term:
 
-Finally, neural-network IPO does not admit a closed-form estimator because
-$f(X_t;\theta)$ is nonlinear in $\theta$. In this case we solve
+$$
+\hat\beta_{\text{EN IPO}}=\arg\min_{\beta}\,\frac{1}{2}\beta^\top(H+\lambda_2 I)\beta-g^\top\beta+\lambda_1\|\beta\|_1,
+$$
 
-$$\hat\theta_{\text{NN IPO}}=\arg\min_{\theta}\frac{1}{T}\sum_t\left[-(B_tf(X_t;\theta)+a_t)^\top y_t+\frac{\delta}{2}(B_tf(X_t;\theta)+a_t)^\top V_t(B_tf(X_t;\theta)+a_t)\right]$$
+with KKT condition $0\in(H+\lambda_2I)\hat\beta-g+\lambda_1\partial\|\hat\beta\|_1$. When $\lambda_1=0$ this reduces to Ridge IPO: $\hat\beta=(H+\lambda_2I)^{-1}g$.
 
-by gradient descent. The gradient is computed through the differentiable MVO
-layer, using  
-$\frac{\partial z_t^*}{\partial\hat y_t}=B_t$.
+---
+
+**Polynomial IPO**: if $\hat{y}_t=\Phi_t\beta$ with $\Phi_t=\phi(X_t)$, replace $X_t$ by $\Phi_t$ to get
+
+$$
+H_{\phi}=\delta\sum_t\Phi_t^\top B_t^\top V_tB_t\Phi_t, \qquad
+g_{\phi}=\sum_t\Phi_t^\top B_t^\top(y_t-\delta V_ta_t),
+$$
+
+so
+
+$$
+\hat\beta_{\text{Poly IPO}}=H_{\phi}^{-1}g_{\phi}, \qquad
+\hat\beta_{\text{Poly Ridge IPO}}=(H_{\phi}+\lambda I)^{-1}g_{\phi}.
+$$
+
+---
+
+**Finite-kernel IPO**: with $\hat{y}_t=\tilde{K}_t\tilde\alpha$ and kernel-ridge regularization matrix $D$,
+
+$$
+\hat{\tilde\alpha}_{\text{Kernel IPO}}=(H_K+\lambda D)^{-1}g_K,
+$$
+
+where
+
+$$
+H_K=\delta\sum_t\tilde{K}_t^\top B_t^\top V_tB_t\tilde{K}_t, \qquad
+g_K=\sum_t\tilde{K}_t^\top B_t^\top(y_t-\delta V_ta_t).
+$$
+
+---
+
+**Neural-network IPO**: $f(X_t;\theta)$ is nonlinear in $\theta$, so no closed form exists. We solve
+
+$$
+\hat\theta_{\text{NN IPO}}=\arg\min_{\theta}\,\frac{1}{T}\sum_t\left[-(B_tf(X_t;\theta)+a_t)^\top y_t+\frac{\delta}{2}(B_tf(X_t;\theta)+a_t)^\top V_t(B_tf(X_t;\theta)+a_t)\right]
+$$
+
+by gradient descent, backpropagating through the differentiable MVO layer via $\partial z_t^*/\partial\hat{y}_t=B_t$.
 
 Thus, Ridge, polynomial, and fixed-anchor kernel IPO have closed-form
 matrix-inverse solutions; Lasso and Elastic Net have convex nonsmooth KKT
