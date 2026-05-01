@@ -102,19 +102,16 @@ on a validation period by minimum realised MVO cost.
 ### Analytical structure of the IPO extensions
 
 The equality-constrained MVO layer is closed-form for every predictor because
-the optimal portfolio depends only on the predicted return vector. Equivalently,
+the optimal portfolio depends only on the predicted return vector:
 
 $$
-z_t^*(\hat y_t)
-=
-B_t \hat y_t + a_t,
+z_t^*(\hat y_t) = B_t \hat y_t + a_t
 $$
 
 where
 
 $$
-B_t
-=
+B_t =
 \frac{1}{\delta}
 \left[
 V_t^{-1}
@@ -124,55 +121,59 @@ V_t^{-1}\mathbf{1}\mathbf{1}^{\top}V_t^{-1}
 }{
 \mathbf{1}^{\top}V_t^{-1}\mathbf{1}
 }
-\right],
-\qquad
-a_t
-=
+\right]
+$$
+
+and
+
+$$
+a_t =
 \frac{
 V_t^{-1}\mathbf{1}
 }{
 \mathbf{1}^{\top}V_t^{-1}\mathbf{1}
-}.
+}
 $$
 
 This affine structure lets us characterize the IPO estimator for each
 predictor class.
 
-For a parameter-linear predictor, such as
+For a parameter-linear predictor,
 
 $$
-\hat y_t = X_t\beta,
+\hat y_t = X_t \beta
 $$
 
-substituting \(z_t^*(\hat y_t)=B_tX_t\beta+a_t\) into the realised MVO cost
-gives a quadratic IPO objective:
+substituting $z_t^*(\hat y_t)=B_tX_t\beta+a_t$ into the realised MVO cost gives
 
 $$
 \mathcal L(\beta)
 =
 \frac{1}{2}\beta^\top H\beta
 -
-g^\top \beta
+g^\top\beta
 +
-\text{penalty}(\beta),
+\text{penalty}(\beta)
 $$
 
-with
+where
 
 $$
-H
-=
+H =
 \delta
 \sum_t
-X_t^\top B_t^\top V_t B_t X_t,
-\qquad
-g
-=
+X_t^\top B_t^\top V_t B_t X_t
+$$
+
+and
+
+$$
+g =
 \sum_t
 X_t^\top B_t^\top
 \left(
 y_t-\delta V_t a_t
-\right).
+\right)
 $$
 
 Therefore, the Ridge IPO estimator has the closed-form solution
@@ -180,10 +181,10 @@ Therefore, the Ridge IPO estimator has the closed-form solution
 $$
 \hat\beta_{\mathrm{Ridge\ IPO}}
 =
-(H+\lambda I)^{-1}g.
+(H+\lambda I)^{-1}g
 $$
 
-For Lasso IPO, the \(L_1\) penalty makes the objective convex but nonsmooth:
+For Lasso IPO, the $L_1$ penalty makes the objective convex but nonsmooth:
 
 $$
 \hat\beta_{\mathrm{Lasso\ IPO}}
@@ -195,7 +196,7 @@ $$
 g^\top\beta
 +
 \lambda\|\beta\|_1
-\right\}.
+\right\}
 $$
 
 It does not have a simple matrix-inverse solution in general, but it is
@@ -208,26 +209,30 @@ H\hat\beta
 -
 g
 +
-\lambda \partial \|\hat\beta\|_1.
+\lambda \partial \|\hat\beta\|_1
 $$
 
 Equivalently, componentwise,
 
 $$
-\begin{cases}
 (H\hat\beta-g)_j
 =
--\lambda\,\operatorname{sign}(\hat\beta_j),
-& \hat\beta_j\neq 0,\\[4pt]
-|(H\hat\beta-g)_j|
-\leq
-\lambda,
-& \hat\beta_j=0.
-\end{cases}
+-\lambda\,\operatorname{sign}(\hat\beta_j)
+\quad
+\text{if } \hat\beta_j\neq 0
 $$
 
-Elastic Net IPO has the same nonsmooth structure after adding the \(L_2\)
-term:
+and
+
+$$
+|(H\hat\beta-g)_j|
+\leq
+\lambda
+\quad
+\text{if } \hat\beta_j=0
+$$
+
+Elastic Net IPO has the same nonsmooth structure after adding the $L_2$ term:
 
 $$
 \hat\beta_{\mathrm{EN\ IPO}}
@@ -239,7 +244,7 @@ $$
 g^\top\beta
 +
 \lambda_1\|\beta\|_1
-\right\},
+\right\}
 $$
 
 with KKT condition
@@ -251,15 +256,15 @@ $$
 -
 g
 +
-\lambda_1\partial\|\hat\beta\|_1.
+\lambda_1\partial\|\hat\beta\|_1
 $$
 
-When \(\lambda_1=0\), Elastic Net reduces to Ridge IPO and has the closed form
+When $\lambda_1=0$, Elastic Net reduces to Ridge IPO and has the closed form
 
 $$
 \hat\beta
 =
-(H+\lambda_2 I)^{-1}g.
+(H+\lambda_2 I)^{-1}g
 $$
 
 Polynomial IPO also has a closed-form structure because the predictor is
@@ -268,25 +273,29 @@ nonlinear in the features but linear in the parameters. If
 $$
 \hat y_t=\Phi_t\beta,
 \qquad
-\Phi_t=\phi(X_t),
+\Phi_t=\phi(X_t)
 $$
 
-then replacing \(X_t\) by \(\Phi_t\) gives
+then replacing $X_t$ by $\Phi_t$ gives
 
 $$
 H_{\phi}
 =
 \delta
 \sum_t
-\Phi_t^\top B_t^\top V_t B_t \Phi_t,
-\qquad
+\Phi_t^\top B_t^\top V_t B_t \Phi_t
+$$
+
+and
+
+$$
 g_{\phi}
 =
 \sum_t
 \Phi_t^\top B_t^\top
 \left(
 y_t-\delta V_t a_t
-\right),
+\right)
 $$
 
 so the polynomial IPO solution is
@@ -294,15 +303,15 @@ so the polynomial IPO solution is
 $$
 \hat\beta_{\mathrm{Poly\ IPO}}
 =
-H_{\phi}^{-1}g_{\phi}.
+H_{\phi}^{-1}g_{\phi}
 $$
 
-With an \(L_2\) penalty, this becomes
+With an $L_2$ penalty, this becomes
 
 $$
 \hat\beta_{\mathrm{Poly\ Ridge\ IPO}}
 =
-(H_{\phi}+\lambda I)^{-1}g_{\phi}.
+(H_{\phi}+\lambda I)^{-1}g_{\phi}
 $$
 
 Finite-kernel IPO has the same structure when the anchor points are fixed. With
@@ -310,16 +319,16 @@ Finite-kernel IPO has the same structure when the anchor points are fixed. With
 $$
 \hat y_t
 =
-\widetilde K_t\widetilde\alpha,
+\widetilde K_t\widetilde\alpha
 $$
 
-the IPO objective is quadratic in \(\widetilde\alpha\). With kernel-ridge
-regularization matrix \(D\), the closed-form solution is
+the IPO objective is quadratic in $\widetilde\alpha$. With kernel-ridge
+regularization matrix $D$, the closed-form solution is
 
 $$
 \hat{\widetilde\alpha}_{\mathrm{Kernel\ IPO}}
 =
-(H_K+\lambda D)^{-1}g_K,
+(H_K+\lambda D)^{-1}g_K
 $$
 
 where
@@ -329,19 +338,23 @@ H_K
 =
 \delta
 \sum_t
-\widetilde K_t^\top B_t^\top V_t B_t \widetilde K_t,
-\qquad
+\widetilde K_t^\top B_t^\top V_t B_t \widetilde K_t
+$$
+
+and
+
+$$
 g_K
 =
 \sum_t
 \widetilde K_t^\top B_t^\top
 \left(
 y_t-\delta V_t a_t
-\right).
+\right)
 $$
 
 Finally, neural-network IPO does not admit a closed-form estimator because
-\(f(X_t;\theta)\) is nonlinear in \(\theta\). In this case we solve
+$f(X_t;\theta)$ is nonlinear in $\theta$. In this case we solve
 
 $$
 \hat\theta_{\mathrm{NN\ IPO}}
@@ -366,7 +379,7 @@ layer, using
 $$
 \frac{\partial z_t^*}{\partial \hat y_t}
 =
-B_t.
+B_t
 $$
 
 Thus, Ridge, polynomial, and fixed-anchor kernel IPO have closed-form
@@ -380,8 +393,8 @@ The resulting analytical classification is summarized below:
 |---|---:|---:|---:|
 | Linear | No | Yes | Yes |
 | Ridge | No | Yes | Yes |
-| Lasso | No | Yes | No, due to L1 nonsmoothness |
-| Elastic Net | No | Yes | No, unless λ1 = 0 |
+| Lasso | No | Yes | No, due to $L_1$ nonsmoothness |
+| Elastic Net | No | Yes | No, unless $\lambda_1 = 0$ |
 | Polynomial | Yes | Yes | Yes |
 | Finite Kernel Ridge | Yes | Yes, if anchors fixed | Yes |
 | Neural Network | Yes | No | No |
@@ -462,8 +475,6 @@ strongest out-of-sample model in our suite.
 
 ## 5. Repository structure
 
-```
-## 5. Repository structure
 
 ```
 ORIE_5370/
