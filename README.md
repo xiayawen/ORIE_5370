@@ -52,10 +52,31 @@ are compared:
   program above.
 
 - **IPO (decision-focused).** $f$ is trained end-to-end on the realised
-  mean-variance cost  
-  $\mathcal L(\theta)=\frac{1}{T}\sum_t[-z^*(\hat y_t)^{\top}y_t+\frac{\delta}{2}z^*(\hat y_t)^{\top}V_tz^*(\hat y_t)]$,  
-  using the closed-form differentiable solution  
-  $z^*(\hat y_t)=\frac{1}{\delta}V_t^{-1}(\hat y_t-\lambda_t\mathbf{1})$,  
+  mean-variance cost
+
+$$
+\mathcal L(\theta)
+=
+\frac{1}{T}
+\sum_t
+\left[
+-z^*(\hat y_t)^{\top}y_t
++
+\frac{\delta}{2}
+z^*(\hat y_t)^{\top}V_tz^*(\hat y_t)
+\right]
+$$
+
+  using the closed-form differentiable solution
+
+$$
+z^*(\hat y_t)
+=
+\frac{1}{\delta}
+V_t^{-1}
+(\hat y_t-\lambda_t\mathbf{1})
+$$
+
   so the entire pipeline is autodifferentiable in PyTorch without a QP layer.
 
 Seven predictor families are evaluated under both paradigms (14 model ×
