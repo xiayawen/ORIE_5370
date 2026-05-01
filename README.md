@@ -54,18 +54,29 @@ are compared:
 - **IPO (decision-focused).** $f$ is trained end-to-end on the realised
   mean-variance cost
 
-<pre>
-𝓛(θ) = (1/T) ∑_t [
-  - z*(ŷ_t)^T y_t
-  + (δ/2) z*(ŷ_t)^T V_t z*(ŷ_t)
-]
-</pre>
+$$
+\mathcal{L}(\theta)
+=
+\frac{1}{T}\sum_t
+\left[
+- z^*(\hat y_t)^\top y_t
++
+\frac{\delta}{2}
+z^*(\hat y_t)^\top V_t z^*(\hat y_t)
+\right],
+$$
 
   using the closed-form differentiable solution
 
-<pre>
-z*(ŷ_t) = (1/δ) V_t^{-1}(ŷ_t - λ_t 1)
-</pre>
+$$
+z^*(\hat y_t)
+=
+\frac{1}{\delta}
+V_t^{-1}
+\left(
+\hat y_t - \lambda_t \mathbf{1}
+\right),
+$$
 
   so the entire pipeline is autodifferentiable in PyTorch without a QP layer.
 
