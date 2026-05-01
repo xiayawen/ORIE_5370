@@ -51,11 +51,15 @@ are compared:
   neural network by mini-batch MSE), then $\hat y$ is plugged into the MVO
   program above.
 
-- **IPO (decision-focused).** $f$ is trained end-to-end on the realised mean-variance cost  
-$\mathcal{L}(\theta)=\frac{1}{T}\sum_t\left[-z^*(\hat y_t)^{\top}y_t+\frac{\delta}{2}z^*(\hat y_t)^{\top}V_tz^*(\hat y_t)\right]$,  
-using the closed-form differentiable solution  
-$z^*(\hat y_t)=\frac{1}{\delta}V_t^{-1}\left(\hat y_t-\lambda_t\mathbf{1}\right)$,  
-so the entire pipeline is autodifferentiable in PyTorch without a QP layer.
+- **IPO (decision-focused).** $f$ is trained end-to-end on the realised mean-variance cost
+
+  $\mathcal{L}(\theta)=\frac{1}{T}\sum_t\left[-z^*(\hat y_t)^{\top}y_t+\frac{\delta}{2}z^*(\hat y_t)^{\top}V_tz^*(\hat y_t)\right]$,
+
+  using the closed-form differentiable solution
+
+  $z^*(\hat y_t)=\frac{1}{\delta}V_t^{-1}\left(\hat y_t-\lambda_t\mathbf{1}\right)$,
+
+  so the entire pipeline is autodifferentiable in PyTorch without a QP layer.
 
 Seven predictor families are evaluated under both paradigms (14 model ×
 paradigm combinations in total):
