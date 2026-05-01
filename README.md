@@ -54,12 +54,32 @@ are compared:
   is fit by least-squares (Lasso / elastic net via coordinate descent;
   neural network by mini-batch MSE), then $\hat y$ is plugged into the MVO
   program above.
+
 - **IPO (decision-focused).** $f$ is trained end-to-end on the realised
   mean-variance cost
-  $\mathcal L(\theta) = \tfrac{1}{T} \sum_t \big[-z^*(\hat y_t)^{\top} y_t
-  + \tfrac{\delta}{2}\, z^*(\hat y_t)^{\top} V_t z^*(\hat y_t)\big]$,
+
+$$
+\mathcal L(\theta)
+=
+\tfrac{1}{T} \sum_t
+\big[
+-z^*(\hat y_t)^{\top} y_t
++
+\tfrac{\delta}{2}\,
+z^*(\hat y_t)^{\top} V_t z^*(\hat y_t)
+\big],
+$$
+
   using the closed-form differentiable solution
-  $z^*(\hat y_t) = \tfrac{1}{\delta} V_t^{-1}(\hat y_t - \lambda_t \mathbf{1})$
+
+$$
+z^*(\hat y_t)
+=
+\tfrac{1}{\delta}
+V_t^{-1}
+(\hat y_t - \lambda_t \mathbf{1})
+$$
+
   so the entire pipeline is autodifferentiable in PyTorch without a QP layer.
 
 Seven predictor families are evaluated under both paradigms (14 model ×
@@ -78,6 +98,303 @@ paradigm combinations in total):
 Hyperparameters (ridge $\lambda$, Lasso $\alpha$, elastic-net mix, kernel
 $\gamma$, NN hidden width, IPO weight decay, IPO L1 penalty) are selected
 on a validation period by minimum realised MVO cost.
+
+### Analytical structure of the IPO extensions
+
+The equality-constrained MVO layer is closed-form for every predictor because
+the optimal portfolio depends only on the predicted return vector. Equivalently,
+
+$$
+z_t^*(\hat y_t)
+=
+B_t \hat y_t + a_t,
+$$
+
+where
+
+$$
+B_t
+=
+\frac{1}{\delta}
+\left[
+V_t^{-1}
+-
+\frac{
+V_t^{-1}\mathbf{1}\mathbf{1}^{\top}V_t^{-1}
+}{
+\mathbf{1}^{\top}V_t^{-1}\mathbf{1}
+}
+\right],
+\qquad
+a_t
+=
+\frac{
+V_t^{-1}\mathbf{1}
+}{
+\mathbf{1}^{\top}V_t^{-1}\mathbf{1}
+}.
+$$
+
+This affine structure lets us characterize the IPO estimator for each
+predictor class.
+
+For a parameter-linear predictor, such as
+
+$$
+\hat y_t = X_t\beta,
+$$
+
+substituting \(z_t^*(\hat y_t)=B_tX_t\beta+a_t\) into the realised MVO cost
+gives a quadratic IPO objective:
+
+$$
+\mathcal L(\beta)
+=
+\frac{1}{2}\beta^\top H\beta
+-
+g^\top \beta
++
+\text{penalty}(\beta),
+$$
+
+with
+
+$$
+H
+=
+\delta
+\sum_t
+X_t^\top B_t^\top V_t B_t X_t,
+\qquad
+g
+=
+\sum_t
+X_t^\top B_t^\top
+\left(
+y_t-\delta V_t a_t
+\right).
+$$
+
+Therefore, the Ridge IPO estimator has the closed-form solution
+
+$$
+\hat\beta_{\mathrm{Ridge\ IPO}}
+=
+(H+\lambda I)^{-1}g.
+$$
+
+For Lasso IPO, the \(L_1\) penalty makes the objective convex but nonsmooth:
+
+$$
+\hat\beta_{\mathrm{Lasso\ IPO}}
+=
+\arg\min_{\beta}
+\left\{
+\frac{1}{2}\beta^\top H\beta
+-
+g^\top\beta
++
+\lambda\|\beta\|_1
+\right\}.
+$$
+
+It does not have a simple matrix-inverse solution in general, but it is
+characterized by the KKT condition
+
+$$
+0
+\in
+H\hat\beta
+-
+g
++
+\lambda \partial \|\hat\beta\|_1.
+$$
+
+Equivalently, componentwise,
+
+$$
+\begin{cases}
+(H\hat\beta-g)_j
+=
+-\lambda\,\operatorname{sign}(\hat\beta_j),
+& \hat\beta_j\neq 0,\\[4pt]
+|(H\hat\beta-g)_j|
+\leq
+\lambda,
+& \hat\beta_j=0.
+\end{cases}
+$$
+
+Elastic Net IPO has the same nonsmooth structure after adding the \(L_2\)
+term:
+
+$$
+\hat\beta_{\mathrm{EN\ IPO}}
+=
+\arg\min_{\beta}
+\left\{
+\frac{1}{2}\beta^\top(H+\lambda_2 I)\beta
+-
+g^\top\beta
++
+\lambda_1\|\beta\|_1
+\right\},
+$$
+
+with KKT condition
+
+$$
+0
+\in
+(H+\lambda_2 I)\hat\beta
+-
+g
++
+\lambda_1\partial\|\hat\beta\|_1.
+$$
+
+When \(\lambda_1=0\), Elastic Net reduces to Ridge IPO and has the closed form
+
+$$
+\hat\beta
+=
+(H+\lambda_2 I)^{-1}g.
+$$
+
+Polynomial IPO also has a closed-form structure because the predictor is
+nonlinear in the features but linear in the parameters. If
+
+$$
+\hat y_t=\Phi_t\beta,
+\qquad
+\Phi_t=\phi(X_t),
+$$
+
+then replacing \(X_t\) by \(\Phi_t\) gives
+
+$$
+H_{\phi}
+=
+\delta
+\sum_t
+\Phi_t^\top B_t^\top V_t B_t \Phi_t,
+\qquad
+g_{\phi}
+=
+\sum_t
+\Phi_t^\top B_t^\top
+\left(
+y_t-\delta V_t a_t
+\right),
+$$
+
+so the polynomial IPO solution is
+
+$$
+\hat\beta_{\mathrm{Poly\ IPO}}
+=
+H_{\phi}^{-1}g_{\phi}.
+$$
+
+With an \(L_2\) penalty, this becomes
+
+$$
+\hat\beta_{\mathrm{Poly\ Ridge\ IPO}}
+=
+(H_{\phi}+\lambda I)^{-1}g_{\phi}.
+$$
+
+Finite-kernel IPO has the same structure when the anchor points are fixed. With
+
+$$
+\hat y_t
+=
+\widetilde K_t\widetilde\alpha,
+$$
+
+the IPO objective is quadratic in \(\widetilde\alpha\). With kernel-ridge
+regularization matrix \(D\), the closed-form solution is
+
+$$
+\hat{\widetilde\alpha}_{\mathrm{Kernel\ IPO}}
+=
+(H_K+\lambda D)^{-1}g_K,
+$$
+
+where
+
+$$
+H_K
+=
+\delta
+\sum_t
+\widetilde K_t^\top B_t^\top V_t B_t \widetilde K_t,
+\qquad
+g_K
+=
+\sum_t
+\widetilde K_t^\top B_t^\top
+\left(
+y_t-\delta V_t a_t
+\right).
+$$
+
+Finally, neural-network IPO does not admit a closed-form estimator because
+\(f(X_t;\theta)\) is nonlinear in \(\theta\). In this case we solve
+
+$$
+\hat\theta_{\mathrm{NN\ IPO}}
+=
+\arg\min_{\theta}
+\frac{1}{T}
+\sum_t
+\left[
+-
+\left(B_tf(X_t;\theta)+a_t\right)^\top y_t
++
+\frac{\delta}{2}
+\left(B_tf(X_t;\theta)+a_t\right)^\top
+V_t
+\left(B_tf(X_t;\theta)+a_t\right)
+\right]
+$$
+
+by gradient descent. The gradient is computed through the differentiable MVO
+layer, using
+
+$$
+\frac{\partial z_t^*}{\partial \hat y_t}
+=
+B_t.
+$$
+
+Thus, Ridge, polynomial, and fixed-anchor kernel IPO have closed-form
+matrix-inverse solutions; Lasso and Elastic Net have convex nonsmooth KKT
+characterizations; and neural-network IPO is nonconvex but differentiable
+through the same closed-form MVO layer.
+
+The resulting analytical classification is summarized below:
+
+| Model | Nonlinear in inputs? | Linear in parameters? | Closed-form IPO estimator? |
+|---|---:|---:|---:|
+| Linear | No | Yes | Yes |
+| Ridge | No | Yes | Yes |
+| Lasso | No | Yes | No, due to L1 nonsmoothness |
+| Elastic Net | No | Yes | No, unless λ1 = 0 |
+| Polynomial | Yes | Yes | Yes |
+| Finite Kernel Ridge | Yes | Yes, if anchors fixed | Yes |
+| Neural Network | Yes | No | No |
+
+The theoretical IPO structure maps to the implemented model classes as follows:
+
+| Model | Predictor class | Analytical structure | Implementation |
+|---|---|---|---|
+| Linear/Ridge | Parameter-linear | Quadratic IPO objective | OLS closed-form; IPO Adam |
+| Lasso/Elastic Net | Parameter-linear + $L_1$ | Convex but nonsmooth | sklearn / Adam with $L_1$ penalty |
+| Polynomial | Nonlinear features, parameter-linear | Quadratic after feature expansion | Feature lift + linear layer |
+| Finite Kernel | Fixed-anchor nonlinear features | Quadratic in kernel weights | Fixed anchors + trainable weights |
+| Neural Network | Nonlinear in parameters | Nonconvex IPO objective | Backprop through MVO layer |
 
 ## 3. Data
 
@@ -146,6 +463,9 @@ strongest out-of-sample model in our suite.
 ## 5. Repository structure
 
 ```
+## 5. Repository structure
+
+```
 ORIE_5370/
 ├── README.md                  This document
 ├── proposal.pdf               Original project proposal
@@ -155,22 +475,25 @@ ORIE_5370/
 │   ├── price_cache_manager.py yfinance cache utilities
 │   ├── price_cache/           Per-ticker daily OHLCV CSVs (≈ 500 names)
 │   └── factor data/           FF5, momentum, and 49-industry daily factor files
-└── Modeling/                  Stage 2 — empirical IPO pipeline
-    ├── README.md              Stage-2 documentation and run instructions
-    ├── build_dataset.py       Build per-month (X, y, V) panel with shrinkage covariance
-    ├── mvo.py                 Differentiable equality-constrained MVO solver
-    ├── ipo_models.py          Seven predictor families
-    ├── train.py               OLS plug-in and IPO training with hyperparameter sweeps
-    ├── evaluate.py            Out-of-sample backtest and bootstrap inference
-    ├── make_figures.py        Plots and tables
-    ├── run_all.py             End-to-end orchestrator
-    ├── figures/               Six PNG figures referenced in the report
-    ├── results/               Performance, coefficient, and pairwise dominance tables
-    └── report/
-        ├── literature_review.md   §II — prior work
-        ├── methodology.md         §III–IV — data, predictors, training, evaluation
-        ├── results.md             §V–VI — empirical results and discussion
-        └── conclusion.md          §VII — conclusions and future work
+├── Modeling/                  Stage 2 — empirical IPO pipeline
+│   ├── README.md              Stage-2 documentation and run instructions
+│   ├── build_dataset.py       Build per-month (X, y, V) panel with shrinkage covariance
+│   ├── mvo.py                 Differentiable equality-constrained MVO solver
+│   ├── ipo_models.py          Seven predictor families
+│   ├── train.py               OLS plug-in and IPO training with hyperparameter sweeps
+│   ├── evaluate.py            Out-of-sample backtest and bootstrap inference
+│   ├── make_figures.py        Plots and tables
+│   ├── run_all.py             End-to-end orchestrator
+│   ├── figures/               Six PNG figures referenced in the report
+│   ├── results/               Performance, coefficient, and pairwise dominance tables
+│   └── report/
+│       ├── literature_review.md   §II — prior work
+│       ├── methodology.md         §III–IV — data, predictors, training, evaluation
+│       ├── results.md             §V–VI — empirical results and discussion
+│       └── conclusion.md          §VII — conclusions and future work
+└── Theoretical Foundation/    Analytical support for nonlinear IPO extensions
+    ├── Closed-Form Structure for Nonlinear IPO Extensions.*
+    └── Nonlinear Features with Parameter-Linear Structure.*
 ```
 
 ## 6. Reproducing the results
