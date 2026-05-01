@@ -99,23 +99,26 @@ $H=\delta\sum_t X_t^\top B_t^\top V_tB_tX_t$ and
 $g=\sum_t X_t^\top B_t^\top(y_t-\delta V_ta_t)$.
 
 Therefore, the Ridge IPO estimator has the closed-form solution  
-$\hat\beta_{\mathrm{Ridge\ IPO}}=(H+\lambda I)^{-1}g$.
+$\hat\beta_{\text{Ridge IPO}}=(H+\lambda I)^{-1}g$.
 
-For Lasso IPO, the $L_1$ penalty makes the objective convex but nonsmooth:  
-$\hat\beta_{\mathrm{Lasso\ IPO}}=\arg\min_{\beta}\left\{\frac{1}{2}\beta^\top H\beta-g^\top\beta+\lambda\lVert\beta\rVert_1\right\}$.
+For Lasso IPO, the $L_1$ penalty makes the objective convex but nonsmooth:
+
+$$\hat\beta_{\text{Lasso IPO}}=\arg\min_{\beta}\left\{\frac{1}{2}\beta^\top H\beta-g^\top\beta+\lambda\|\beta\|_1\right\}$$
 
 It does not have a simple matrix-inverse solution in general, but it is
 characterized by the KKT condition  
-$0\in H\hat\beta-g+\lambda\partial\lVert\hat\beta\rVert_1$.
+$0\in H\hat\beta-g+\lambda\partial\|\hat\beta\|_1$.
 
 Equivalently, componentwise,  
-$(H\hat\beta-g)_j=-\lambda\operatorname{sign}(\hat\beta_j)$ if $\hat\beta_j\neq0$, and  
+$(H\hat\beta-g)_j=-\lambda\text{sign}(\hat\beta_j)$ if $\hat\beta_j\neq0$, and  
 $|(H\hat\beta-g)_j|\leq\lambda$ if $\hat\beta_j=0$.
 
-Elastic Net IPO has the same nonsmooth structure after adding the $L_2$ term:  
-$\hat\beta_{\mathrm{EN\ IPO}}=\arg\min_{\beta}\left\{\frac{1}{2}\beta^\top(H+\lambda_2I)\beta-g^\top\beta+\lambda_1\lVert\beta\rVert_1\right\}$,  
+Elastic Net IPO has the same nonsmooth structure after adding the $L_2$ term:
+
+$$\hat\beta_{\text{EN IPO}}=\arg\min_{\beta}\left\{\frac{1}{2}\beta^\top(H+\lambda_2I)\beta-g^\top\beta+\lambda_1\|\beta\|_1\right\}$$
+
 with KKT condition  
-$0\in(H+\lambda_2I)\hat\beta-g+\lambda_1\partial\lVert\hat\beta\rVert_1$.
+$0\in(H+\lambda_2I)\hat\beta-g+\lambda_1\partial\|\hat\beta\|_1$.
 
 When $\lambda_1=0$, Elastic Net reduces to Ridge IPO and has the closed form  
 $\hat\beta=(H+\lambda_2I)^{-1}g$.
@@ -127,23 +130,25 @@ $\Phi_t$ gives
 $H_{\phi}=\delta\sum_t\Phi_t^\top B_t^\top V_tB_t\Phi_t$ and  
 $g_{\phi}=\sum_t\Phi_t^\top B_t^\top(y_t-\delta V_ta_t)$,  
 so the polynomial IPO solution is  
-$\hat\beta_{\mathrm{Poly\ IPO}}=H_{\phi}^{-1}g_{\phi}$.
+$\hat\beta_{\text{Poly IPO}}=H_{\phi}^{-1}g_{\phi}$.
 
 With an $L_2$ penalty, this becomes  
-$\hat\beta_{\mathrm{Poly\ Ridge\ IPO}}=(H_{\phi}+\lambda I)^{-1}g_{\phi}$.
+$\hat\beta_{\text{Poly Ridge IPO}}=(H_{\phi}+\lambda I)^{-1}g_{\phi}$.
 
 Finite-kernel IPO has the same structure when the anchor points are fixed. With
-$\hat y_t=\widetilde K_t\widetilde\alpha$, the IPO objective is quadratic in
-$\widetilde\alpha$. With kernel-ridge regularization matrix $D$, the closed-form
+$\hat y_t=\tilde K_t\tilde\alpha$, the IPO objective is quadratic in
+$\tilde\alpha$. With kernel-ridge regularization matrix $D$, the closed-form
 solution is  
-$\hat{\widetilde\alpha}_{\mathrm{Kernel\ IPO}}=(H_K+\lambda D)^{-1}g_K$,  
+$\hat{\tilde\alpha}_{\text{Kernel IPO}}=(H_K+\lambda D)^{-1}g_K$,  
 where  
-$H_K=\delta\sum_t\widetilde K_t^\top B_t^\top V_tB_t\widetilde K_t$ and  
-$g_K=\sum_t\widetilde K_t^\top B_t^\top(y_t-\delta V_ta_t)$.
+$H_K=\delta\sum_t\tilde K_t^\top B_t^\top V_tB_t\tilde K_t$ and  
+$g_K=\sum_t\tilde K_t^\top B_t^\top(y_t-\delta V_ta_t)$.
 
 Finally, neural-network IPO does not admit a closed-form estimator because
-$f(X_t;\theta)$ is nonlinear in $\theta$. In this case we solve  
-$\hat\theta_{\mathrm{NN\ IPO}}=\arg\min_{\theta}\frac{1}{T}\sum_t[-(B_tf(X_t;\theta)+a_t)^\top y_t+\frac{\delta}{2}(B_tf(X_t;\theta)+a_t)^\top V_t(B_tf(X_t;\theta)+a_t)]$  
+$f(X_t;\theta)$ is nonlinear in $\theta$. In this case we solve
+
+$$\hat\theta_{\text{NN IPO}}=\arg\min_{\theta}\frac{1}{T}\sum_t\left[-(B_tf(X_t;\theta)+a_t)^\top y_t+\frac{\delta}{2}(B_tf(X_t;\theta)+a_t)^\top V_t(B_tf(X_t;\theta)+a_t)\right]$$
+
 by gradient descent. The gradient is computed through the differentiable MVO
 layer, using  
 $\frac{\partial z_t^*}{\partial\hat y_t}=B_t$.
