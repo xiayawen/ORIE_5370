@@ -23,6 +23,14 @@ for the full table and `report/conclusion.md` for the discussion.
 ## File layout
 
 ```
+Data/
+  get_data.ipynb # Download / prepare S&P 500 price data
+  analysis_data.ipynb # Clean and inspect price + factor data
+  price_cache_manager.py # Reusable yfinance cache manager
+  price_cache/ # Cached daily OHLCV files for S&P 500 stocks
+  factor data/ # FF5, Momentum, and Industry-49 daily factor files
+  sp500_filtered.csv # Filtered S&P 500 universe used for modeling
+  
 Modeling/
   build_dataset.py            # Build sp500_filtered.csv + IPO panel from price_cache
   mvo.py                      # Mean-variance optimization helpers (analytical)
@@ -45,6 +53,11 @@ Modeling/
     literature_review.md      # § II prior work
     results.md                # § V results, § VI discussion
     conclusion.md             # § VII conclusion + future work
+
+Theoretical Foundation/
+  Closed-Form Structure for Nonlinear IPO Extensions.*
+  # Analytical appendix for the MVO layer,
+  # nonlinear IPO extensions, and covariance estimation
 ```
 
 ## How to run
@@ -96,6 +109,27 @@ invested) used by Butler & Kwon § 2.4. Hyperparameters (ridge λ, lasso α,
 elastic-net mix, kernel γ, NN hidden width, IPO weight decay, IPO L1
 penalty) are swept on a validation period and chosen by lowest realised
 MVO cost.
+
+## Theoretical foundation
+
+The project also includes a theoretical appendix that supports the empirical
+IPO extensions. The appendix shows that the equality-constrained MVO decision
+layer remains closed-form because the optimal portfolio is affine in the
+predicted return vector, `z*(ŷ) = B_t ŷ + a_t`. This allows IPO models to
+backpropagate through the portfolio decision without using a differentiable QP
+solver.
+
+The appendix also clarifies the optimization structure of the nonlinear
+extensions. Polynomial and fixed-anchor kernel predictors are nonlinear in
+features but linear in trainable parameters, so they preserve a quadratic IPO
+structure. Ridge IPO admits a closed-form estimator; Lasso and Elastic Net are
+convex but nonsmooth because of the L1 penalty; neural-network IPO is nonconvex
+and trained by gradient descent.
+
+Finally, the appendix documents the covariance estimator used in the empirical
+pipeline: a 60-day rolling daily covariance matrix with Ledoit-Wolf-style
+shrinkage toward a scaled identity target, rescaled by 21 to match the monthly
+return horizon used in the MVO objective.
 
 ## Performance metrics
 
