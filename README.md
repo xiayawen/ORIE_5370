@@ -103,7 +103,7 @@ $\hat\beta_{\text{Ridge IPO}}=(H+\lambda I)^{-1}g$.
 
 For Lasso IPO, the $L_1$ penalty makes the objective convex but nonsmooth:
 
-$$\hat\beta_{\text{Lasso IPO}}=\arg\min_{\beta}\left\{\frac{1}{2}\beta^\top H\beta-g^\top\beta+\lambda\|\beta\|_1\right\}$$
+$$\hat\beta_{\text{Lasso IPO}}=\arg\min_{\beta}\,\frac{1}{2}\beta^\top H\beta-g^\top\beta+\lambda\|\beta\|_1$$
 
 It does not have a simple matrix-inverse solution in general, but it is
 characterized by the KKT condition  
@@ -115,7 +115,7 @@ $|(H\hat\beta-g)_j|\leq\lambda$ if $\hat\beta_j=0$.
 
 Elastic Net IPO has the same nonsmooth structure after adding the $L_2$ term:
 
-$$\hat\beta_{\text{EN IPO}}=\arg\min_{\beta}\left\{\frac{1}{2}\beta^\top(H+\lambda_2I)\beta-g^\top\beta+\lambda_1\|\beta\|_1\right\}$$
+$$\hat\beta_{\text{EN IPO}}=\arg\min_{\beta}\,\frac{1}{2}\beta^\top(H+\lambda_2 I)\beta-g^\top\beta+\lambda_1\|\beta\|_1$$
 
 with KKT condition  
 $0\in(H+\lambda_2I)\hat\beta-g+\lambda_1\partial\|\hat\beta\|_1$.
