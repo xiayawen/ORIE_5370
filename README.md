@@ -53,22 +53,22 @@ are compared:
 
 - **IPO (decision-focused).** $f$ is trained end-to-end on the realised mean-variance cost
 
-  $$
-  \mathcal{L}(\theta)
-  =
-  \frac{1}{T}\sum_t
-  \left[
-  -z^*(\hat{y}_t)^{\top}y_t
-  +
-  \frac{\delta}{2}z^*(\hat{y}_t)^{\top}V_t z^*(\hat{y}_t)
-  \right]
-  $$
+$$
+\mathcal{L}(\theta)
+=
+\frac{1}{T}\sum_t
+\left[
+-z^*(\hat{y}_t)^{\top}y_t
++
+\frac{\delta}{2}z^*(\hat{y}_t)^{\top}V_t z^*(\hat{y}_t)
+\right]
+$$
 
-  using the closed-form differentiable solution
+using the closed-form differentiable solution
 
-  $$z^*(\hat{y}_t)=\frac{1}{\delta}V_t^{-1}\!\left(\hat{y}_t-\lambda_t\mathbf{1}\right)$$
+$$z^*(\hat{y}_t)=\frac{1}{\delta}V_t^{-1}\left(\hat{y}_t-\lambda_t\mathbf{1}\right)$$
 
-  so the entire pipeline is autodifferentiable in PyTorch without a QP layer.
+so the entire pipeline is autodifferentiable in PyTorch without a QP layer.
 
 Seven predictor families are evaluated under both paradigms (14 model ×
 paradigm combinations in total):
