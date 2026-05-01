@@ -6,9 +6,9 @@ emits two artefacts in ``data_cache/``:
 
 * ``sp500_filtered.csv`` — the long-format daily panel of price, return, and
   factor data for the filtered ticker universe.
-* ``panel.npz`` — a per-month dataset of cross-sectional design matrices
-  ``X_t``, realized next-month returns ``y_t``, and shrinkage covariance
-  estimates ``V_t``. This is what the IPO / OLS models consume.
+* ``panel_linear.npz`` or ``panel_nonlinear.npz`` — a per-month dataset of 
+  cross-sectional design matrices ``X_t``, realized next-month returns ``y_t``, 
+  and shrinkage covariance estimates ``V_t``. This is what the IPO / OLS models consume.
 
 Run from the ``Project_extension/`` directory:
 
@@ -28,6 +28,13 @@ PRICE_CACHE = HERE / "price_cache"
 FACTOR_DIR = HERE / "factor data"
 OUT_DIR = HERE / "data_cache"
 OUT_DIR.mkdir(exist_ok=True, parents=True)
+
+# ===========================================================================
+# MASTER TOGGLE: Choose your covariance estimation method
+# Options: "linear" (2004 Ledoit-Wolf) or "nonlinear" (2020 Analytical)
+# ===========================================================================
+COV_METHOD = "linear"  
+
 
 START_DATE = pd.Timestamp("2005-01-01")
 END_DATE = pd.Timestamp("2024-12-31")
@@ -165,26 +172,34 @@ def cross_sectional_standardise(panel: pd.DataFrame, feat_cols: list[str]) -> pd
 ASSET_FEATURES = ["mom_12_2", "mom_1m", "rev_1d", "vol_60", "log_dollar_vol_60"]
 COMMON_FEATURES = ["Mkt-RF", "SMB", "HML", "RMW", "CMA", "Mom"]
 
+# --- METHOD 1: 2004 Linear Shrinkage ---
+def ledoit_wolf_shrinkage(R: np.ndarray) -> np.ndarray:
+    """Linear shrinkage of the sample covariance towards a scaled identity."""
+    T, n = R.shape
+    R = R - R.mean(axis=0, keepdims=True)
+    S = (R.T @ R) / T  # sample covariance (MLE form)
+    mu = np.trace(S) / n
+    F = mu * np.eye(n)
 
+    d2 = np.linalg.norm(S - F, "fro") ** 2
+    R2 = R ** 2
+    pi_mat = (R2.T @ R2) / T - S ** 2
+    pi_hat = pi_mat.sum()
+    kappa = pi_hat / d2 if d2 > 0 else 0.0
+    shrink = max(0.0, min(1.0, kappa / T))
+    return shrink * F + (1 - shrink) * S
+
+# --- METHOD 2: 2020 Analytical Nonlinear Shrinkage ---
 def analytical_nonlinear_shrinkage(R: np.ndarray) -> np.ndarray:
-    """Analytical nonlinear shrinkage of the sample covariance matrix.
-    
-    Implements Ledoit and Wolf (2020) "Analytical Nonlinear Shrinkage of
-    Large-Dimensional Covariance Matrices".
-    """
+    """Analytical nonlinear shrinkage of the sample covariance matrix."""
     n, p = R.shape
     
-    # 1. Compute sample covariance matrix (MLE form)
     R_centered = R - R.mean(axis=0, keepdims=True)
     S = (R_centered.T @ R_centered) / n
     
-    # 2. Spectral decomposition
     eigenvalues, eigenvectors = np.linalg.eigh(S)
-    
-    # Numerical stability: bound eigenvalues slightly above 0 for edge cases
     eigenvalues = np.maximum(eigenvalues, 1e-12)
     
-    # 3. Bandwidth parameters
     h_n = n ** (-1/3)
     h_n_j = eigenvalues * h_n
     
@@ -194,7 +209,6 @@ def analytical_nonlinear_shrinkage(R: np.ndarray) -> np.ndarray:
     sqrt5 = np.sqrt(5.0)
     pi = np.pi
     
-    # 4. Estimate spectral density and its Hilbert transform
     for i in range(p):
         l_i = eigenvalues[i]
         diff = l_i - eigenvalues
@@ -202,13 +216,9 @@ def analytical_nonlinear_shrinkage(R: np.ndarray) -> np.ndarray:
         ratio = diff / h_n_j
         sq_ratio = ratio ** 2
         
-        # Epanechnikov kernel positive part
         kernel_part = np.maximum(1.0 - 0.2 * sq_ratio, 0.0)
-        
-        # Spectral density estimator
         f_tilde[i] = np.mean((3.0 / (4.0 * sqrt5 * h_n_j)) * kernel_part)
         
-        # Hilbert transform estimator
         term1 = - (3.0 * diff) / (10.0 * pi * (h_n_j ** 2))
         term2_coef = (3.0 / (4.0 * sqrt5 * pi * h_n_j)) * kernel_part
         
@@ -223,17 +233,11 @@ def analytical_nonlinear_shrinkage(R: np.ndarray) -> np.ndarray:
         
         H_f_tilde[i] = np.mean(term1 + term2_coef * log_term)
         
-    # 5. Compute the optimal nonlinear shrinkage formula
     c = p / n
     denominator = (pi * c * eigenvalues * f_tilde)**2 + (1.0 - c - pi * c * eigenvalues * H_f_tilde)**2
     d_tilde = eigenvalues / denominator
-    
-    # 6. Safety conditioning for downstream PyTorch MVO
-    # Because n (60) < p (100), c > 1 and the matrix is theoretically rank-deficient. 
-    # We impose a tiny floor on the eigenvalues so V_t remains strictly invertible.
     d_tilde = np.maximum(d_tilde, 1e-6)
     
-    # 7. Recompose the covariance matrix
     S_tilde = eigenvectors @ np.diag(d_tilde) @ eigenvectors.T
     
     return S_tilde
@@ -293,8 +297,15 @@ def build_panel(panel: pd.DataFrame) -> dict:
 
         R_window = ret_wide.iloc[loc - COV_WINDOW + 1 : loc + 1][cs.index].fillna(0.0).to_numpy()
         
-        # Apply the new Analytical Nonlinear Shrinkage
-        V = analytical_nonlinear_shrinkage(R_window) * 21.0
+        # ---------------------------------------------------
+        # Apply the toggle selection for covariance shrinkage
+        # ---------------------------------------------------
+        if COV_METHOD == "linear":
+            V = ledoit_wolf_shrinkage(R_window) * 21.0
+        elif COV_METHOD == "nonlinear":
+            V = analytical_nonlinear_shrinkage(R_window) * 21.0
+        else:
+            raise ValueError(f"Unknown COV_METHOD selected: {COV_METHOD}")
 
         out_dates.append(t)
         out_tickers.append(cs.index.to_numpy())
@@ -350,6 +361,7 @@ def main() -> None:
     print(f"PRICE_CACHE  = {PRICE_CACHE}")
     print(f"FACTOR_DIR   = {FACTOR_DIR}")
     print(f"OUT_DIR      = {OUT_DIR}")
+    print(f"COV_METHOD   = {COV_METHOD}")
 
     panel = build_sp500_filtered()
     panel = merge_factors(panel)
@@ -369,7 +381,8 @@ def main() -> None:
         f"cross-section size: min={n_per_t.min()} median={int(np.median(n_per_t))} max={n_per_t.max()}"
     )
 
-    out_npz = OUT_DIR / "panel.npz"
+    # Automatically name the output file based on the selected method
+    out_npz = OUT_DIR / f"panel_{COV_METHOD}.npz"
     save_panel(arrays, out_npz)
     print(f"wrote {out_npz}")
 

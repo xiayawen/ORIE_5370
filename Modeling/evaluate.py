@@ -34,7 +34,7 @@ import numpy as np
 import pandas as pd
 import torch
 
-from build_dataset import OUT_DIR, load_panel
+from build_dataset import OUT_DIR, load_panel, COV_METHOD
 from ipo_models import (
     LinearPredictor, PolynomialPredictor, RidgePredictor,
     LassoPredictor, ElasticNetPredictor,
@@ -272,7 +272,7 @@ def linear_coefficients(name: str, summary: dict, d_in: int,
 # ---------------------------------------------------------------------------
 
 def main() -> None:
-    panel = load_panel(OUT_DIR / "panel.npz")
+    panel = load_panel(OUT_DIR / f"panel_{COV_METHOD}.npz")
     with open(RESULTS / "training_summary.json") as f:
         summary = json.load(f)
 

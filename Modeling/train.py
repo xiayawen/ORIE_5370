@@ -30,7 +30,7 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 
-from build_dataset import OUT_DIR, load_panel
+from build_dataset import OUT_DIR, load_panel, COV_METHOD
 from ipo_models import (
     LinearPredictor, PolynomialPredictor, RidgePredictor,
     LassoPredictor, ElasticNetPredictor,
@@ -372,7 +372,7 @@ def run_all(panel: dict, seed: int = 0) -> dict:
 
 
 def main() -> None:
-    panel = load_panel(OUT_DIR / "panel.npz")
+    panel = load_panel(OUT_DIR / f"panel_{COV_METHOD}.npz")
     run_all(panel)
 
 
