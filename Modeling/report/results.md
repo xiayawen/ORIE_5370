@@ -10,7 +10,7 @@ fully-invested MVO; 60-day Ledoit–Wolf-shrunk covariance.
 
 Sorted by realised mean MVO cost (lower is better).
 
-| Model | Cost | Ann. ret | Ann. vol | Sharpe | Max DD | $\|z\|_1$ | $P(\text{cost}<\text{OLS\_lin})$ |
+| Model | Cost | Ann. ret | Ann. vol | Sharpe | Max DD | Gross exposure | Bootstrap P vs OLS-linear |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | **IPO_elasticnet** | **−0.0011** | 18.2% | 15.5% | **1.18** | **9.5%** | 3.53 | **1.000** |
 | OLS_elasticnet     | −0.0010 | 13.3% | 14.5% | 0.91 | 12.4% | **2.84** | 0.995 |
