@@ -6,7 +6,7 @@ to the linear baseline of [Butler & Kwon (2022)][butler] on a U.S. equity
 mean-variance portfolio problem. Across seven predictor families — linear,
 ridge, Lasso, Elastic Net, polynomial, kernel ridge, single-hidden-layer
 neural network — and two training paradigms (OLS plug-in and end-to-end
-IPO), we find three robust empirical patterns.
+IPO), we find several robust empirical patterns.
 
 [butler]: https://arxiv.org/abs/2102.09287
 
@@ -42,6 +42,14 @@ This quantitatively confirms the central claim of decision-focused
 learning: prediction loss and decision loss are not aligned in the
 mean-variance portfolio problem.
 
+**5. Stable covariance conditioning is a strict prerequisite.** Our empirical
+ablation study reveals that in $p > n$ regimes, replacing globally regularised
+linear shrinkage (Ledoit-Wolf 2004) with local analytical nonlinear shrinkage
+(Ledoit-Wolf 2020) causes catastrophic downstream MVO failure due to near-zero
+eigenvalues. However, L1-regularised predictors (Lasso) uniquely survive this
+ill-conditioning, acting as a mathematical circuit breaker against explosive
+inversion noise.
+
 ## Practical implications
 
 For a practitioner deciding between predict-then-optimize and IPO on a
@@ -56,6 +64,11 @@ similar mean-variance portfolio problem:
   ridge / NN families benefit from end-to-end decision-focused
   training. The closed-form gradient through the equality-constrained
   MVO solution makes this engineering-cheap.
+* **Condition your covariance globally in $p > n$ regimes.** Do not use
+  local nonlinear shrinkage methods for covariance matrices unless you
+  apply a strict positive-definite floor or use an L1-regularised predictor
+  to safeguard against inversion explosions. The classic Ledoit-Wolf (2004)
+  linear shrinker remains the safest default for MVO.
 * **Avoid unregularised polynomial / kernel expansions.** Both are
   bottom of the table under both training paradigms. The IPO
   objective's curvature combined with the lifted feature space
@@ -76,8 +89,9 @@ of [§VI of the proposal][outline] flagged in advance:
   3,000-name CRSP universe of [Gu, Kelly & Xiu (2020)][gukelly] would
   also stress-test whether the NN's regularisation effect persists at
   scale.
-* **Risk model.** We hold the 60-day Ledoit-Wolf-shrunk covariance
-  estimator fixed throughout. Joint estimation of $(\hat\mu, \hat\Sigma)$
+* **Risk model.** While we explored both 2004 linear and 2020 analytical
+  nonlinear shrinkage estimators, we held the covariance matrix fixed prior
+  to the MVO layer. Joint estimation of $(\hat\mu, \hat\Sigma)$
   with a decision-focused loss is a natural extension and is one of the
   *Unsolved Questions* listed in our outline.
 * **Constraints.** The MVO program is equality-constrained only; long-
@@ -109,7 +123,8 @@ decision-focused training.** The two combine multiplicatively: the
 IPO-trained Elastic Net predictor achieves Sharpe 1.18 with a 9.5%
 maximum drawdown — better than any model in the sweep that uses only
 one of the two ingredients. Pure flexibility (kernel, polynomial)
-without either ingredient is harmful.
+without either ingredient is harmful, and these gains strictly depend
+on a well-conditioned covariance matrix foundation.
 
 We therefore answer the central question of the proposal — *Do
 nonlinear prediction models improve decision quality?* — with a

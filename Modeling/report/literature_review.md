@@ -97,16 +97,29 @@ unexplored.
 [krauss]: https://doi.org/10.1016/j.ejor.2016.10.031
 [fischer]: https://doi.org/10.1016/j.ejor.2017.11.054
 
-## 2.4 Where this project fits
+## 2.4 Covariance estimation in high dimensions
+
+A critical vulnerability in the classical mean-variance framework is the inversion of the covariance matrix. When the number of assets $p$ is large relative to the observation window $n$ (the $p > n$ regime), the sample covariance matrix is mathematically singular and its inverse amplifies estimation noise into extreme portfolio weights. 
+
+To resolve this, Ledoit & Wolf (2004) introduced linear shrinkage, which globally pulls the sample covariance matrix towards a well-conditioned target (such as a scaled identity matrix), guaranteeing mathematical invertibility. This approach remains the industry standard for stable portfolio optimisation. 
+
+More recently, Ledoit & Wolf (2020) introduced *analytical nonlinear shrinkage*, a state-of-the-art methodology that uses the Hilbert transform of the limiting spectral density to apply local, non-linear attraction to the sample eigenvalues. While mathematically optimal under large-dimensional asymptotics, the interplay between these advanced nonlinear covariance estimators and integrated prediction models (IPO) remains unexplored. Our project addresses this gap directly via an empirical ablation study.
+
+[ledoit2004]: https://doi.org/10.1016/S0047-259X(03)00096-4
+[ledoit2020]: https://doi.org/10.1214/19-AOS1921
+
+## 2.5 Where this project fits
 
 We treat Butler & Kwon (2022) as the linear IPO benchmark, and we
 augment its predictor class with the regularised linear models
 (Lasso and Elastic Net), polynomial expansions, kernel ridge, and
 single-hidden-layer neural networks that the proposal §IV specifies.
 Each predictor is trained in two paradigms — OLS plug-in and
-end-to-end IPO — and evaluated on realised mean-variance cost,
-risk-adjusted return, drawdown, and bootstrap dominance against the
-linear-OLS baseline. The empirical question is therefore: does the
-flexibility documented in §2.3 produce decision-quality gains in the
-sense of §2.2, or does it amplify the estimation-error problem flagged
-in §2.1?
+end-to-end IPO. Furthermore, we test this pipeline across both linear 
+and nonlinear covariance shrinkage regimes. 
+
+Evaluated on realised mean-variance cost, risk-adjusted return, drawdown, 
+and bootstrap dominance against the linear-OLS baseline, the empirical 
+question is therefore: does the flexibility documented in §2.3 produce 
+decision-quality gains in the sense of §2.2, or does it amplify the 
+estimation-error problem flagged in §2.1 and §2.4?

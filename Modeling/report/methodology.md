@@ -48,14 +48,12 @@ proportions are preserved.
 
 ### Covariance estimation
 
-For each rebalance month $t$ we estimate $V_t$ from the trailing 60 trading-
-day returns of the surviving cross-section using the Ledoit–Wolf (2004)
-linear shrinkage estimator (`build_dataset.ledoit_wolf_shrinkage`). The daily
-covariance is rescaled by 21 to match the units of the realized monthly
-return that enters the MVO cost. Shrinkage keeps $V_t$ well-conditioned
-even when $n \approx 100$ and the sample window is short — directly
-addressing the "covariance not invertible" question raised in the
-outline's *Unsolved Questions* section.
+For each rebalance month $t$ we estimate $V_t$ from the trailing 60 trading-day returns of the surviving cross-section ($n = 60, p = 100$). The pipeline supports two conditioning methods via the `COV_METHOD` toggle in `build_dataset.py`:
+
+1. **Ledoit–Wolf (2004) Linear Shrinkage (Primary Baseline):** Shrinks the sample covariance toward a scaled identity matrix. Because our concentration ratio $c = p/n = 1.67 > 1$, the raw sample matrix is mathematically singular. Linear shrinkage mathematically acts as a global Ridge penalty, keeping $V_t$ strictly positive-definite and safely invertible for the downstream MVO layer. 
+2. **Ledoit–Wolf (2020) Analytical Nonlinear Shrinkage (Ablation Study):** Shrinks eigenvalues based on local density via a proportional-bandwidth kernel estimation of the Hilbert transform. While mathematically optimal under large-dimensional asymptotics, our empirical ablation (see §V Results) demonstrates that in a severe $p > n$ regime, it fails to adequately bound zero-eigenvalues away from zero, leading to numerical explosions upon inversion unless explicitly safeguarded by an L1-regularised predictor.
+
+The daily covariance is rescaled by 21 to match the units of the realized monthly return that enters the MVO cost.
 
 ## 2. Predictive models
 
@@ -128,21 +126,18 @@ Performance metrics reported in `results/performance.csv`:
   (paired iid bootstrap on the per-month cost differences, $B = 5000$)
 
 ## 5. Files produced
-
-```
-data_cache/panel.npz            per-month {X_t, y_t, V_t}
+data_cache/panel_linear.npz     per-month {X_t, y_t, V_t} (or panel_nonlinear.npz)
 results/training_summary.json   chosen hyperparameters per model
 results/models/*.pt             trained state-dicts
 results/per_month.csv           OOS per-rebalance return per model
 results/per_month_cost.csv      OOS per-rebalance MVO cost per model
 results/performance.csv         summary metrics + bootstrap dominance
 results/coefficients.csv        linear / ridge feature weights
-figures/cum_returns.png         cumulative growth of \$1
+figures/cum_returns.png         cumulative growth of $1
 figures/cost_bar.png            mean MVO cost
 figures/sharpe_bar.png          Sharpe by model
 figures/cost_vs_r2.png          decision quality vs prediction quality
 figures/dominance_heatmap.png   bootstrap dominance vs OLS-linear
-```
 
 ## 6. Caveats relative to the outline
 
