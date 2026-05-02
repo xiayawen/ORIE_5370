@@ -323,6 +323,7 @@ python run_all.py --skip-data
 run_all.py automatically sets KMP_DUPLICATE_LIB_OK=TRUE and pins
 OpenMP / MKL threading to a single thread, which avoids a deadlock we
 observed in Anaconda + PyTorch on macOS during the MLP training stage.
+```
 
 The four files in Modeling/report/ cite numbers directly from the CSV
 artefacts in Modeling/results/ and embed the figures in
