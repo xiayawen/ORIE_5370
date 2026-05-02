@@ -41,12 +41,16 @@ This study addresses three sub-questions:
 
 ## 2. Methodology
 
-We solve the equality-constrained mean-variance program  
-$\min_{z \in \mathbb{R}^n}\; -z^{\top}y + \frac{\delta}{2}z^{\top}Vz \quad \text{s.t.}\quad \mathbf{1}^{\top}z=1$
+We solve the equality-constrained mean-variance program
+
+$$
+\min_{z \in \mathbb{R}^n}\; -z^{\top}y + \frac{\delta}{2}z^{\top}Vz
+\quad \text{s.t.}\quad \mathbf{1}^{\top}z=1
+$$
 
 with risk-aversion parameter $\delta = 50$ (matching Butler & Kwon § 4) and
-a 60-day sample covariance $V$. We implement a toggle between Ledoit–Wolf (2004) 
-linear shrinkage (the baseline) and Ledoit–Wolf (2020) analytical nonlinear 
+a 60-day sample covariance $V$. We implement a toggle between Ledoit–Wolf (2004)
+linear shrinkage (the baseline) and Ledoit–Wolf (2020) analytical nonlinear
 shrinkage to stress-test MVO stability in $p > n$ regimes. Two training paradigms
 are compared:
 
@@ -57,13 +61,20 @@ are compared:
 
 - **IPO (decision-focused).** $f$ is trained end-to-end on the realised mean-variance cost
 
-  $\mathcal{L}(\theta)=\frac{1}{T}\sum_t\left[-z^*(\hat y_t)^{\top}y_t\right.$
-
-  $\left.+\frac{\delta}{2}z^*(\hat y_t)^{\top}V_tz^*(\hat y_t)\right]$,
+  $$
+  \mathcal{L}(\theta)=\frac{1}{T}\sum_t
+  \left[
+  -z^*(\hat y_t)^{\top}y_t
+  +\frac{\delta}{2}z^*(\hat y_t)^{\top}V_tz^*(\hat y_t)
+  \right],
+  $$
 
   using the closed-form differentiable solution
 
-  $z^*(\hat y_t)=\frac{1}{\delta}V_t^{-1}\left(\hat y_t-\lambda_t\mathbf{1}\right)$,
+  $$
+  z^*(\hat y_t)=\frac{1}{\delta}V_t^{-1}
+  \left(\hat y_t-\lambda_t\mathbf{1}\right),
+  $$
 
   so the entire pipeline is autodifferentiable in PyTorch without a QP layer.
 
