@@ -276,6 +276,8 @@ The combined best-practice recipe that emerges from the sweep is therefore
 **(L1-regularised linear predictor) + (decision-focused training)** sitting on top of a globally regularised covariance matrix.
 
 ## 5. Repository structure
+
+```text
 ORIE_5370/
 ├── README.md                  This document
 ├── proposal.pdf               Original project proposal
@@ -304,11 +306,12 @@ ORIE_5370/
 └── Theoretical Foundation/    Analytical support for nonlinear IPO extensions
 ├── Closed-Form Structure for Nonlinear IPO Extensions.*
 └── Nonlinear Features with Parameter-Linear Structure.*
+```
 
 ## 6. Reproducing the results
 
 ```bash
-git clone [https://github.com/xiayawen/ORIE_5370.git](https://github.com/xiayawen/ORIE_5370.git)
+git clone https://github.com/xiayawen/ORIE_5370.git
 cd ORIE_5370/Modeling
 
 # Symlink the team data files from the sibling Project/ folder.
@@ -320,10 +323,11 @@ python build_dataset.py
 
 # Run the full pipeline: train → evaluate → figures (~4 minutes).
 python run_all.py --skip-data
-run_all.py automatically sets KMP_DUPLICATE_LIB_OK=TRUE and pins
+```
+
+`run_all.py` automatically sets `KMP_DUPLICATE_LIB_OK=TRUE` and pins
 OpenMP / MKL threading to a single thread, which avoids a deadlock we
 observed in Anaconda + PyTorch on macOS during the MLP training stage.
-```
 
 The four files in Modeling/report/ cite numbers directly from the CSV
 artefacts in Modeling/results/ and embed the figures in
@@ -341,9 +345,9 @@ which constitutes a natural extension:
   the small-sample bootstrap. Extending to a CRSP-scale 3,000-name
   universe is computationally feasible but was outside scope.
 - **Risk model.** We explored both 2004 linear and 2020 analytical nonlinear
-shrinkage estimators, but held the covariance matrix $\hat\Sigma$ fixed prior
-to the MVO layer. Joint decision-focused estimation of $(\hat\mu, \hat\Sigma)$
-is a natural follow-up.
+  shrinkage estimators, but held the covariance matrix $\hat\Sigma$ fixed prior
+  to the MVO layer. Joint decision-focused estimation of $(\hat\mu, \hat\Sigma)$
+  is a natural follow-up.
 - **Constraints.** The MVO program is equality-constrained only.
   Long-only, leverage, and turnover constraints would compress the
   spread between models on raw cost but possibly amplify it on
