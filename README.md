@@ -20,7 +20,9 @@ under both training paradigms on a 2005–2024 panel of S&P 500 equities, with
 2019–2024 held out for evaluation. The best model — an elastic-net predictor
 trained end-to-end against MVO cost — achieves an annualised Sharpe ratio of
 **1.18** with a **9.5%** maximum drawdown over the 71-month test period, and
-beats the OLS-linear baseline in 100% of paired bootstrap resamples.
+beats the OLS-linear baseline in 100% of paired bootstrap resamples. Furthermore, 
+an empirical ablation reveals that these gains strictly require a globally 
+regularised covariance estimator to prevent downstream inversion failures.
 
 ## 1. Research question
 
@@ -43,7 +45,9 @@ We solve the equality-constrained mean-variance program
 $\min_{z \in \mathbb{R}^n}\; -z^{\top}y + \frac{\delta}{2}z^{\top}Vz \quad \text{s.t.}\quad \mathbf{1}^{\top}z=1$
 
 with risk-aversion parameter $\delta = 50$ (matching Butler & Kwon § 4) and
-a 60-day Ledoit–Wolf-shrunk sample covariance $V$. Two training paradigms
+a 60-day sample covariance $V$. We implement a toggle between Ledoit–Wolf (2004) 
+linear shrinkage (the baseline) and Ledoit–Wolf (2020) analytical nonlinear 
+shrinkage to stress-test MVO stability in $p > n$ regimes. Two training paradigms
 are compared:
 
 - **OLS plug-in (predict-then-optimise).** Predictor $\hat y = f(x;\theta)$
@@ -240,7 +244,7 @@ absolute portfolio weights).
 | OLS Kernel          | +0.0524 | 15.9% | 31.3% | 0.51 | 43.8% | 9.40 | 0.000 |
 | IPO Polynomial      | +0.0862 |  6.3% | 43.2% | 0.15 | 66.0% | 10.85 | 0.000 |
 
-Three robust empirical findings emerge:
+Four robust empirical findings emerge:
 
 1. **L1 regularisation is the single most important ingredient.** Both
    Lasso and Elastic Net under OLS plug-in already achieve negative
@@ -261,16 +265,17 @@ Three robust empirical findings emerge:
    (kernel and MLP under OLS) sit at the worst costs. Improving
    prediction accuracy does not monotonically improve portfolio
    decisions.
+4. **Stable covariance conditioning is a strict prerequisite.** An ablation 
+   study replacing linear shrinkage (2004) with local nonlinear shrinkage (2020) 
+   in our $p > n$ regime caused catastrophic MVO inversion failures. However, 
+   the OLS Lasso model survived the ill-conditioning perfectly, demonstrating 
+   that an L1 penalty on expected returns acts as a mathematical "circuit breaker" 
+   against explosive noise.
 
 The combined best-practice recipe that emerges from the sweep is therefore
-**(L1-regularised linear predictor) + (decision-focused training)** — both
-ingredients contribute independently, and combining them produces the
-strongest out-of-sample model in our suite.
+**(L1-regularised linear predictor) + (decision-focused training)** sitting on top of a globally regularised covariance matrix.
 
 ## 5. Repository structure
-
-
-```
 ORIE_5370/
 ├── README.md                  This document
 ├── proposal.pdf               Original project proposal
@@ -297,14 +302,13 @@ ORIE_5370/
 │       ├── results.md             §V–VI — empirical results and discussion
 │       └── conclusion.md          §VII — conclusions and future work
 └── Theoretical Foundation/    Analytical support for nonlinear IPO extensions
-    ├── Closed-Form Structure for Nonlinear IPO Extensions.*
-    └── Nonlinear Features with Parameter-Linear Structure.*
-```
+├── Closed-Form Structure for Nonlinear IPO Extensions.*
+└── Nonlinear Features with Parameter-Linear Structure.*
 
 ## 6. Reproducing the results
 
 ```bash
-git clone https://github.com/xiayawen/ORIE_5370.git
+git clone [https://github.com/xiayawen/ORIE_5370.git](https://github.com/xiayawen/ORIE_5370.git)
 cd ORIE_5370/Modeling
 
 # Symlink the team data files from the sibling Project/ folder.
@@ -316,16 +320,14 @@ python build_dataset.py
 
 # Run the full pipeline: train → evaluate → figures (~4 minutes).
 python run_all.py --skip-data
-```
-
-`run_all.py` automatically sets `KMP_DUPLICATE_LIB_OK=TRUE` and pins
+run_all.py automatically sets KMP_DUPLICATE_LIB_OK=TRUE and pins
 OpenMP / MKL threading to a single thread, which avoids a deadlock we
 observed in Anaconda + PyTorch on macOS during the MLP training stage.
 
-The four files in `Modeling/report/` cite numbers directly from the CSV
-artefacts in `Modeling/results/` and embed the figures in
-`Modeling/figures/`. Concatenating the four files in the order
-`literature_review.md → methodology.md → results.md → conclusion.md`
+The four files in Modeling/report/ cite numbers directly from the CSV
+artefacts in Modeling/results/ and embed the figures in
+Modeling/figures/. Concatenating the four files in the order
+literature_review.md → methodology.md → results.md → conclusion.md
 yields the final write-up.
 
 ## 7. Limitations and future work
@@ -337,9 +339,10 @@ which constitutes a natural extension:
   proposal envisaged 300, and a longer historical window would tighten
   the small-sample bootstrap. Extending to a CRSP-scale 3,000-name
   universe is computationally feasible but was outside scope.
-- **Risk model.** The covariance $\hat\Sigma$ is held fixed at the
-  Ledoit–Wolf shrinkage estimator. Joint decision-focused estimation of
-  $(\hat\mu, \hat\Sigma)$ is a natural follow-up.
+- **Risk model.** We explored both 2004 linear and 2020 analytical nonlinear
+shrinkage estimators, but held the covariance matrix $\hat\Sigma$ fixed prior
+to the MVO layer. Joint decision-focused estimation of $(\hat\mu, \hat\Sigma)$
+is a natural follow-up.
 - **Constraints.** The MVO program is equality-constrained only.
   Long-only, leverage, and turnover constraints would compress the
   spread between models on raw cost but possibly amplify it on
@@ -378,3 +381,5 @@ which constitutes a natural extension:
 - Ledoit, O., & Wolf, M. (2004). A well-conditioned estimator for
   large-dimensional covariance matrices. *Journal of Multivariate
   Analysis*, 88(2), 365–411.
+- Ledoit, O., & Wolf, M. (2020). Analytical nonlinear shrinkage of large-dimensional
+covariance matrices. The Annals of Statistics, 48(5), 3043–3065.
